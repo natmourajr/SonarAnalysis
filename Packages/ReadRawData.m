@@ -1,7 +1,8 @@
 % Projeto Marinha do Brasil
 
-%Autor: Natanael Junior (natmourajr@gmail.com)
+% Autor: Natanael Junior (natmourajr@gmail.com)
 % Laboratorio de Processamento de Sinais - UFRJ
+% Laboratorio de Tecnologia Sonar - UFRJ/Marinha do Brasil
 
 % iniciando o script
 clear all;
@@ -14,10 +15,12 @@ fprintf('Starting %s.m\n',mfilename('fullpath'));
 inputpath = getenv('INPUTDATAPATH');
 outputpath = getenv('OUTPUTDATAPATH');
 
+% selected version of data
+subfolder = '8classes';
 
 % if raw_data has created...
-if(exist(sprintf('%s/RawData.mat',outputpath),'file'))
-    answer = input(sprintf('File OUTPUTPATH/RawData.mat exists, perform CreateRawData.m? [Y,n]'),'s');
+if(exist(sprintf('%s/RawData_%s.mat',outputpath,subfolder),'file'))
+    answer = input(sprintf('File OUTPUTPATH/RawData_%s.mat exists, perform ReadRawData.m? [Y,n]',subfolder),'s');
     if strcmp(answer,'Y')
     else if strcmp(answer,'n')
             clear all;
@@ -27,9 +30,6 @@ if(exist(sprintf('%s/RawData.mat',outputpath),'file'))
         end
     end
 end
-
-subfolder = '8classes';
-
 
 class_labels = {};
 class_info = {};
@@ -54,13 +54,13 @@ for iletter = 'A':'Z'
            [aux{irun},fs] = wavread(sprintf('%s/%s/Class%s/%s',inputpath,subfolder,iletter,dir_info(ifile).name));
         end
         class_info.(class_labels{iclass}).n_runs = irun;
-        sonar_data.(class_labels{iclass}).run_data = aux;
+        sonar_data.(class_labels{iclass}).run = aux;
         iclass = iclass +1;
     else
         continue;
     end    
 end
 
-save(sprintf('%s/RawData.mat',outputpath),'fs','sonar_data','class_labels','class_info');
+save(sprintf('%s/RawData_%s.mat',outputpath,subfolder),'fs','sonar_data','class_labels','class_info');
 
 fprintf('Finishing %s.m\n',mfilename('fullpath'));
