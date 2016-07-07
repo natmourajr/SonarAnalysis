@@ -90,3 +90,6 @@ ENV/
 
 # Result Folders
 Results/*
+
+# Temporary files
+*~
