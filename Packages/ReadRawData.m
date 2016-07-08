@@ -16,7 +16,7 @@ inputpath = getenv('INPUTDATAPATH');
 outputpath = getenv('OUTPUTDATAPATH');
 
 % selected version of data
-subfolder = '8classes';
+subfolder = '4classes';
 
 % if raw_data has created...
 if(exist(sprintf('%s/RawData_%s.mat',outputpath,subfolder),'file'))
