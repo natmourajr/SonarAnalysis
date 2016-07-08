@@ -46,13 +46,29 @@ $ matlab -nodesktop -r LofarAnalysis; exit
 $ ls $OUTPUTDATAPATH
 ```
 
-9 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and install all libraries listed in requirements.txt
+9 - Some libraries are necessary, to install them do
 ```
-$ pip install --no-deps -r requirements.txt
+$ cd $SONAR_WORKSPACE
 ```
 
-10 - Now you can go to Packages folders and access all analysis
+10 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and install all libraries listed in requirements.txt
+```
+$ pip install numpy scipy matplotlib sklearn jupyter pandas
+```
+
+11 - Now you can go to Packages folders and access all analysis
 ```
 $ cd Packages
 ```
+
+12 - To access a specific analysis, do
+```
+$ cd Packages/<Specific Analysis Name>
+```
+
+13 - And
+```
+$ jupyter notebook
+```
+
 
