@@ -53,7 +53,7 @@ $ cd $SONAR_WORKSPACE
 
 10 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and install all libraries listed in requirements.txt
 ```
-$ pip install numpy scipy matplotlib sklearn jupyter pandas
+$ pip install -r requirements.txt
 ```
 
 11 - Now you can go to Packages folders and access all analysis
