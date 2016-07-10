@@ -18,6 +18,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 export OUTPUTDATAPATH=$SONAR_WORKSPACE/Results
+export PYTHONPATH=$SONAR_WORKSPACE:$PYTHONPATH
 
 export MY_PATH=$PWD
 
@@ -30,7 +31,6 @@ if [ -d "$OUTPUTDATAPATH" ]; then
         mkdir $OUTPUTDATAPATH
         cd $SONAR_WORKSPACE/Packages
         for i in $(ls -d */); do mkdir $OUTPUTDATAPATH/${i%%/}; done
-        cd $MY_PATH
     fi
 else
     echo "OUTPUTDATAPATH: $OUTPUTDATAPATH doesnt exists"
@@ -39,8 +39,9 @@ else
     mkdir $OUTPUTDATAPATH
     cd $SONAR_WORKSPACE/Packages
     for i in $(ls -d */); do mkdir $OUTPUTDATAPATH/${i%%/}; done
-    cd $MY_PATH
 fi
+
+cd $MY_PATH
 
 if [ -d "$OUTPUTDATAPATH/DataHandler" ]; then
 	rm -rf $OUTPUTDATAPATH/DataHandler

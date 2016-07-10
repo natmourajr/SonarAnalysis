@@ -31,7 +31,9 @@ if [ -d "$OUTPUTDATAPATH/NoveltyDetection" ]; then
         for i in $(ls -d */); do 
     		mkdir $PACKAGE_OUTPUT/${i%%/}; 
     		mkdir $PACKAGE_OUTPUT/${i%%/}/picts;
-    		mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/result_files; 
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files;
     	done
         cd $MY_PATH
     else
@@ -51,7 +53,9 @@ else
     for i in $(ls -d */); do 
     	mkdir $PACKAGE_OUTPUT/${i%%/}; 
     	mkdir $PACKAGE_OUTPUT/${i%%/}/picts; 
-    	mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/result_files;
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files; 
     done
     cd $MY_PATH
 fi
