@@ -15,6 +15,10 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     # Mac OSX
     export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Doutorado/SonarAnalysis
     export INPUTDATAPATH=/Users/natmourajr/Public/Marinha/Data
+    
+    # For matplotlib
+	export LC_ALL=en_US.UTF-8
+	export LANG=en_US.UTF-8
 fi
 
 export OUTPUTDATAPATH=$SONAR_WORKSPACE/Results
@@ -46,3 +50,4 @@ cd $MY_PATH
 if [ -d "$OUTPUTDATAPATH/DataHandler" ]; then
 	rm -rf $OUTPUTDATAPATH/DataHandler
 fi
+
