@@ -46,8 +46,3 @@ else
 fi
 
 cd $MY_PATH
-
-if [ -d "$OUTPUTDATAPATH/DataHandler" ]; then
-	rm -rf $OUTPUTDATAPATH/DataHandler
-fi
-

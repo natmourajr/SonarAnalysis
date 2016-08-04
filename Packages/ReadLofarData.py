@@ -15,6 +15,7 @@ import pickle
 import numpy as np
 
 from scipy.io import loadmat
+from sklearn.externals import joblib
 
 print 'Starting '+os.path.basename(__file__)
 
@@ -59,8 +60,8 @@ if os.path.exists("%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.mat"%(outputpat
             data[iship][irun] = run
     class_labels = ships
     
-    file = open("%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.pickle"%(outputpath,subfolder,n_pts_fft,decimation_rate), "wb" )
-    pickle.dump([data,class_labels],file)
+    file = "%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.jbl"%(outputpath,subfolder,n_pts_fft,decimation_rate)
+    joblib.dump([data,class_labels],file,compress=9)
 
 
 

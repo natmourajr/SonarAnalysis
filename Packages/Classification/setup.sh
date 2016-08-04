@@ -7,20 +7,25 @@
 
 # Check Env Variables
 
-if [ -z "$OUTPUTDATAPATH" ]; then
+
+
+if [ -z "$SONAR_WORKSPACE" ]; then
 	echo 
     echo "DO main setup.sh"
     echo
     return
 fi  
 
+
+source $SONAR_WORKSPACE/setup.sh
+
 export MY_PATH=$PWD
 
 export PACKAGE_OUTPUT=$OUTPUTDATAPATH/Classification
 
 # Folder Configuration
-if [ -d "$OUTPUTDATAPATH/NoveltyDetection" ]; then
-    read -e -p "Folder $OUTPUTDATAPATH/NoveltyDetection exist, Do you want to erase it? [Y,n] " yn_erase
+if [ -d "$OUTPUTDATAPATH/Classification" ]; then
+    read -e -p "Folder $OUTPUTDATAPATH/Classification exist, Do you want to erase it? [Y,n] " yn_erase
     if [ "$yn_erase" = "Y" ]; then
     	echo
         echo "creating OUTPUTDATAPATH struct"
@@ -32,11 +37,13 @@ if [ -d "$OUTPUTDATAPATH/NoveltyDetection" ]; then
     		mkdir $PACKAGE_OUTPUT/${i%%/}; 
     		mkdir $PACKAGE_OUTPUT/${i%%/}/picts;
     		mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files; 
     	done
         cd $MY_PATH
     else
     	echo
-    	echo "I did nothing"
+    	echo "Only Export Env Variables"
     	echo 
     fi
 
@@ -52,6 +59,8 @@ else
     	mkdir $PACKAGE_OUTPUT/${i%%/}; 
     	mkdir $PACKAGE_OUTPUT/${i%%/}/picts; 
     	mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files; 
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files;
     done
     cd $MY_PATH
 fi
