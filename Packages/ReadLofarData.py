@@ -12,6 +12,8 @@ import os.path
 import wave
 import pickle
 
+from sklearn.externals import joblib
+
 import numpy as np
 
 from scipy.io import loadmat
@@ -55,13 +57,16 @@ if os.path.exists("%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.mat"%(outputpat
             run['Freq'] = np.linspace(0, run['Fs']/2.0, F)
             run['Time'] = np.linspace(0, T * 1./run['Fs'], T)
             run['Signal'] = matfile['data_lofar'][0,0][ship][0,0]['run'][0,irun]
+	    run['Windows'] = matfile['data_lofar'][0,0][ship][0,0]['windonazed_run'][0,irun]
             
             # add signal
             data[iship][irun] = run
     class_labels = ships
     
-    file = "%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.jbl"%(outputpath,subfolder,n_pts_fft,decimation_rate)
-    joblib.dump([data,class_labels],file,compress=9)
+    #file = "%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.jbl"%(outputpath,subfolder,n_pts_fft,decimation_rate)
+    #joblib.dump([data,class_labels],file,compress=9)
+
+    joblib.dump([data,class_labels],"%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.jbl"%(outputpath,subfolder,n_pts_fft,decimation_rate),compress=9)
 
 
 

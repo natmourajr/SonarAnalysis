@@ -133,6 +133,8 @@ stat_test_results = {};
 for iclass = 1:numel(class_labels) % All Classes
     fprintf('%s - All Runs in RawData_%s file\n',class_labels{iclass},subfolder);
     
+    aux = [];
+    
     % loop over all runs
     for irun = 1:length(sonar_data.(class_labels{iclass}).run)
         fprintf('Processing %s - run %i\n',class_labels{iclass},irun);
@@ -204,8 +206,9 @@ for iclass = 1:numel(class_labels) % All Classes
             end
             warning ON
         end
-        
+        aux = [aux; windownazed_data];
     end
+    data_lofar.(class_labels{iclass}).windownazed_data = aux;
 end
 
 fprintf('\nCreating LOFAR Data File\n');
