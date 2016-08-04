@@ -1,11 +1,13 @@
 #!/bin/bash 
 
-# SonarAnalysis/PreProcessing Package Setup Script
+# SonarAnalysis/Classification Package Setup Script
 #
 # Author: natmourajr@gmail.com
 #
 
 # Check Env Variables
+
+
 
 if [ -z "$SONAR_WORKSPACE" ]; then
 	echo 
@@ -14,6 +16,7 @@ if [ -z "$SONAR_WORKSPACE" ]; then
     return
 fi  
 
+
 source $SONAR_WORKSPACE/setup.sh
 
 export MY_PATH=$PWD
@@ -21,8 +24,8 @@ export MY_PATH=$PWD
 export PACKAGE_OUTPUT=$OUTPUTDATAPATH/PreProcessing
 
 # Folder Configuration
-if [ -d "$OUTPUTDATAPATH/NoveltyDetection/PreProcessing" ]; then
-    read -e -p "Folder $OUTPUTDATAPATH/NoveltyDetection/PreProcessing exist, Do you want to erase it? [Y,n] " yn_erase
+if [ -d "$OUTPUTDATAPATH/PreProcessing" ]; then
+    read -e -p "Folder $OUTPUTDATAPATH/PreProcessing exist, Do you want to erase it? [Y,n] " yn_erase
     if [ "$yn_erase" = "Y" ]; then
     	echo
         echo "creating OUTPUTDATAPATH struct"
@@ -34,6 +37,8 @@ if [ -d "$OUTPUTDATAPATH/NoveltyDetection/PreProcessing" ]; then
     		mkdir $PACKAGE_OUTPUT/${i%%/}; 
     		mkdir $PACKAGE_OUTPUT/${i%%/}/picts;
     		mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
+    		mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files; 
     	done
         cd $MY_PATH
     else
@@ -45,7 +50,7 @@ if [ -d "$OUTPUTDATAPATH/NoveltyDetection/PreProcessing" ]; then
 else
 	echo
     echo "OUTPUTDATAPATH: $OUTPUTDATAPATH doesnt exists"
-    echo "creating OUTPUTDATAPATH/PreProcessing struct"
+    echo "creating OUTPUTDATAPATH/Classification struct"
     echo
     rm -rf $PACKAGE_OUTPUT
     mkdir $PACKAGE_OUTPUT
@@ -54,6 +59,8 @@ else
     	mkdir $PACKAGE_OUTPUT/${i%%/}; 
     	mkdir $PACKAGE_OUTPUT/${i%%/}/picts; 
     	mkdir $PACKAGE_OUTPUT/${i%%/}/output_files; 
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files; 
+    	mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files;
     done
     cd $MY_PATH
 fi
