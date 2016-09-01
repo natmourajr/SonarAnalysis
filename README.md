@@ -14,6 +14,7 @@ $ git clone https://github.com/natmourajr/SonarAnalysis.git
 ```
 $ cd SonarAnalysis
 ```
+
 3 - This package works with a couple of Environment Variables, to change their values, do
 ```
 $ vim setup.sh
@@ -33,40 +34,61 @@ $ cd Packages
 
 6 - In Signal Processing Lab machines, run matlab with ReadRawData command to generate RawData Files
 ```
-$ matlab -nodesktop -r ReadRawData; exit
+$ matlab -nodesktop -r ReadRawData
 ```
 
 7 - In Signal Processing Lab machines, run matlab with LofarAnalysis command to generate LofarData Files
 ```
-$ matlab -nodesktop -r LofarAnalysis; exit
+$ matlab -nodesktop -r LofarAnalysis
 ```
 
-8 - After run these two Matlab scripts, the two new matlab files should be in $OUTPUTDATAPATH, to check it
+8 - In Signal Processing Lab machines, run matlab with LofarAnalysis command to generate LofarData Files
+```
+$ python ReadLofarData.py
+```
+
+9 - After run these two Matlab scripts, the two new matlab files should be in $OUTPUTDATAPATH, to check it
 ```
 $ ls $OUTPUTDATAPATH
 ```
 
-9 - Some libraries are necessary, to install them do
+10 - Some libraries are necessary, to install them do
 ```
 $ cd $SONAR_WORKSPACE
 ```
 
-10 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and install all libraries listed in requirements.txt
+11 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and upgrade pip (to update pip)
+```
+$ pip install --upgrade pip
+```
+
+12 - In this version, all analysis will be produce in Python. I suggest create a virtualenv and install all libraries listed in requirements.txt
 ```
 $ pip install -r requirements.txt
 ```
 
-11 - Now you can go to Packages folders and access all analysis
+Obs: To update all packages
+```
+$ pip freeze --local | grep -v '^\-e' | cut -d = -f 1  | xargs pip install -U
+```
+
+
+13 - Now you can go to Packages folders and access all analysis
 ```
 $ cd Packages
 ```
 
-12 - To access a specific analysis, do
+14 - To access a specific analysis, do
 ```
-$ cd Packages/<Specific Analysis Name>
+$ cd <Specific Analysis Name>
 ```
 
-13 - And
+15 - Run a specific setup.sh
+```
+$ source setup.sh
+```
+
+16 - And
 ```
 $ jupyter notebook
 ```
