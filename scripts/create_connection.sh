@@ -12,7 +12,7 @@ then
 	echo Remote Machine Name: $2
 	echo Remote Port Number: $3
 	echo "Opening Connection"
-	ssh -N -f -L localhost:$1:localhost:$3 natmourajr@$2.lps.ufrj.br
+	ssh -N -f -L localhost:$1:localhost:$3 $USER@$2.lps.ufrj.br
 else
 	echo "invalid number of arguments"
 	echo "USAGE: ./create_connection.sh <local port> <remote machine name> <remote port>" 
