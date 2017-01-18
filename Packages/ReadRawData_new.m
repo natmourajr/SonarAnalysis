@@ -79,6 +79,6 @@ for iclass = 1:100
 end
 
 if did_once
-	save(sprintf('%s/%s/raw_data_info.mat',outputpath,subfolder),'class_info','fs');
+	save(sprintf('%s/%s/raw_data_info.mat',outputpath,subfolder),'class_labels','class_info','fs');
 end
 fprintf('Finishing %s.m\n',mfilename('fullpath'));
