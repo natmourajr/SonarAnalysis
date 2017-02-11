@@ -127,6 +127,7 @@ norm_parameters.threshold = 1.3;
 
 fprintf('\nLOFAR Computing\n');
 data_lofar = [];
+all_time = [];
 stat_test_results = {};
 
 % loop over all class
@@ -134,6 +135,7 @@ for iclass = 1:numel(class_labels) % All Classes
     fprintf('%s - All Runs in RawData_%s file\n',class_labels{iclass},subfolder);
     
     aux = [];
+    all_data = [];
     
     % loop over all runs
     for irun = 1:length(sonar_data.(class_labels{iclass}).run)
@@ -154,9 +156,16 @@ for iclass = 1:numel(class_labels) % All Classes
         intensity(intensity<-.2)=0;
         data_lofar.(class_labels{iclass}).run{irun} = intensity(1:spectrum_bins_left,:); % William
         
+        if size(all_data,1)==0
+            all_data = intensity(1:spectrum_bins_left,:);
+            all_time = t;
+        else
+            all_data = [all_data intensity(1:spectrum_bins_left,:)];
+            all_time = [all_time t];
+        end
         
         if show_plot
-            h = figure('visible','on');
+            h = figure('visible','on','Position', [100, 100, 1049, 895]);
             
             imagesc(f(1:spectrum_bins_left),t,data_lofar.(class_labels{iclass}).run{irun}');
             
@@ -209,7 +218,29 @@ for iclass = 1:numel(class_labels) % All Classes
         aux = [aux; windownazed_data];
     end
     data_lofar.(class_labels{iclass}).windownazed_data = aux;
+    
+    if show_plot
+        h = figure('visible','on', 'Position', [100, 100, 1049, 895]);
+        
+        imagesc(f(1:spectrum_bins_left),all_time,all_data');
+        
+        if decimation_rate >=1
+            title(sprintf('LOFARgram for %s, Decimation Ratio: %d, %d FFT Points',class_labels{iclass},decimation_rate,n_pts_fft),'FontSize', 15,'FontWeight', 'bold');
+        else
+            title(sprintf('LOFARgram for %s, %d FFT Points',class_labels{iclass},n_pts_fft),'FontSize', 15,'FontWeight', 'bold');
+        end
+        
+        ylabel('Time (seconds)','FontSize', 15,'FontWeight', 'bold');
+        xlabel('Frequency (Hz)','FontSize', 15,'FontWeight', 'bold');
+        colorbar;
+        saveas(h,sprintf('%s/lofargram_%s_%s_fftpoints_%i_decimation_%i.png',outputpath,subfolder,class_labels{iclass},n_pts_fft,decimation_rate));
+        close(h);
+        
+    end
+    
 end
+
+
 
 fprintf('\nCreating LOFAR Data File\n');
 save(sprintf('%s/LofarData_%s_%i_fft_pts_%i_decimation_rate.mat',outputpath,subfolder,n_pts_fft,decimation_rate),'decimation_rate','Fs','num_overlap','norm_parameters','data_lofar','n_pts_fft');
