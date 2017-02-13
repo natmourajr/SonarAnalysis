@@ -29,7 +29,7 @@ outputpath = os.environ['OUTPUTDATAPATH']
 # check if a file exists
 
 # Variable to chance Database
-subfolder = "4classes"
+subfolder = "4classes_old"
 
 # Hard Codded?! 
 n_pts_fft = 1024

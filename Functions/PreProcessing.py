@@ -392,7 +392,7 @@ class PCDCooperative(object):
                                           		  batch_size=trn_params.batch_size,
                                           		  callbacks=[earlyStopping], 
                                           		  verbose=trn_params.train_verbose,
-                                          		  validation_data=([data[train_ids], data[train_ids]],
+                                          		  validation_data=([data[test_ids], data[test_ids]],
                                                           		   target[test_ids]),
                                           		  shuffle=True)
 				self.models[ipcd] = my_model

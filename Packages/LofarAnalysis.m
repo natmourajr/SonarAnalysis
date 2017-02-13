@@ -15,7 +15,7 @@ fprintf('Starting %s.m\n',mfilename('fullpath'));
 outputpath = getenv('OUTPUTDATAPATH');
 
 % selected version of data
-subfolder = '4classes';
+subfolder = '4classes_old';
 
 % if raw_data has created...
 if(~exist(sprintf('%s/RawData_%s.mat',outputpath,subfolder),'file'))
