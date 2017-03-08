@@ -93,3 +93,7 @@ Results/*
 
 # Temporary files
 *~
+
+# For Mac Systems
+._.DS_Store
+.DS_Store
