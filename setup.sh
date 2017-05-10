@@ -13,8 +13,8 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
     export INPUTDATAPATH=/home/natmourajr/Public/Marinha/Data
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     # Mac OSX
-    export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Doutorado/SonarAnalysis
-    export INPUTDATAPATH=/Users/natmourajr/Public/Marinha/Data
+    export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Projects/SonarAnalysis
+    export INPUTDATAPATH=/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification
     
     # For matplotlib
 	export LC_ALL=en_US.UTF-8
