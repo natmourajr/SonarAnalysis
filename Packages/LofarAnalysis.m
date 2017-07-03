@@ -17,12 +17,14 @@ fprintf('Starting %s.m\n',mfilename('fullpath'));
 %outputpath = getenv('OUTPUTDATAPATH');
 
 inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Projects/SonarAnalysis/Results';
+outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
-database = '8classes';
+database = '24classes';
 
-if(~exist(sprintf('%s/%s',outputpath,database),'dir'))
+fprintf('Performing Lofar Analysis in %s database\n',database);
+
+if(~exist(sprintf('%s/%s/data_info_file.mat',outputpath,database),'file'))
     fprintf('File Struct %s/%s not found, perform ReadRawData.m',outputpath,database);
     return;
 end
@@ -32,9 +34,49 @@ load(sprintf('%s/%s/data_info_file.mat',outputpath,database))
 
 data_info.lofar_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
 
-data_info.n_pts_fft = 1024;
-data_info.decimation_rate = 3;
-data_info.spectrum_bins_left = 400;
+% get user information
+user_loop = true;
+
+while(user_loop)
+    data_info.n_pts_fft = 0;
+    data_info.n_pts_fft = input(sprintf('Number of FFT Points [default: 1024]: '));
+
+    if isempty(data_info.n_pts_fft)
+        data_info.n_pts_fft = 1024;
+    end
+
+    data_info.decimation_rate = 0;
+    data_info.decimation_rate = input(sprintf('Decimation Ratio [default: 3]: '));
+
+    if isempty(data_info.decimation_rate)
+        data_info.decimation_rate = 3;
+    end
+
+    data_info.spectrum_bins_left = 0;
+    data_info.spectrum_bins_left = input(sprintf('Spectrum Bins left for Analysis [default: 400]: '));
+
+    if isempty(data_info.spectrum_bins_left)
+        data_info.spectrum_bins_left = 400;
+    end
+
+    % show user params
+    fprintf('\n\n');
+    fprintf('Number of FFT points: %i\n',data_info.n_pts_fft);
+    fprintf('Decimation Rate: %i\n',data_info.decimation_rate);
+    fprintf('Spectrum Bins: %i\n',data_info.spectrum_bins_left);
+    
+    answer = input(sprintf('Are User params correct? [Y,n] '),'s');
+
+    if strcmp(answer,'Y')
+        user_loop = false;
+    end
+
+end
+
+
+%data_info.n_pts_fft = 1024;
+%data_info.decimation_rate = 3;
+%data_info.spectrum_bins_left = 400;
 
 aux_class = 1;
 

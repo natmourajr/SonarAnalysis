@@ -22,10 +22,10 @@ from sklearn.externals import joblib
 print 'Starting '+os.path.basename(__file__)
 
 # System var. point to external folders
-datapath = '/Users/natmourajr/Workspace/Projects/SonarAnalysis/Results'
+datapath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results'
 
 # Variable to chance Database
-database = "4classes"
+database = "24classes"
 
 # lofar analysis params
 n_pts_fft = 1024;
@@ -44,6 +44,7 @@ else:
         class_labels[iclass] = str(data_info['data_info']['class_labels'][0][0][0][iclass][0])
         class_filename = ('lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i'%
                           (n_pts_fft,decimation_rate,spectrum_bins_left))
+        print "Reading class: %s"%(class_labels[iclass])
         if not os.path.exists("%s/%s/%s/%s.mat"%(datapath,database,class_labels[iclass],class_filename)):
             #print "%s/%s/%s/%s.mat"%(datapath,database,class_labels[iclass],class_filename)
             exit()

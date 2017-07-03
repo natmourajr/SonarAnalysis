@@ -16,10 +16,13 @@ fprintf('Starting %s.m\n',mfilename('fullpath'));
 %outputpath = getenv('OUTPUTDATAPATH');
 
 inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Projects/SonarAnalysis/Results';
+outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
-database = '8classes';
+database = 'DemonRealData';
+
+
+fprintf('Reading Raw data in %s database\n',database);
 
 if(exist(sprintf('%s/%s',outputpath,database),'dir'))
     answer = input(sprintf('Folder %s/%s exists, perform ReadRawData.m? [Y,n]',outputpath,database),'s');
