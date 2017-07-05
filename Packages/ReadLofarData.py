@@ -22,10 +22,11 @@ from sklearn.externals import joblib
 print 'Starting '+os.path.basename(__file__)
 
 # System var. point to external folders
-datapath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results'
+# datapath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results'
+datapath = os.environ.get('OUTPUTDATAPATH')
 
 # Variable to chance Database
-database = "24classes"
+database = "4classes"
 
 # lofar analysis params
 n_pts_fft = 1024;

@@ -9,12 +9,12 @@
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     # Ubuntu
-    export SONAR_WORKSPACE=/home/natmourajr/Workspace/Doutorado/SonarAnalysis
-    export INPUTDATAPATH=/home/natmourajr/Public/Marinha/Data
+    export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
+    export INPUTDATAPATH=/home/vinicius.mello/Workspace/Data
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     # Mac OSX
-    export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Doutorado/SonarAnalysis
-    export INPUTDATAPATH=/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification
+    export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/SonarAnalysis
+    export INPUTDATAPATH=/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/Data
     
     # For matplotlib
 	export LC_ALL=en_US.UTF-8

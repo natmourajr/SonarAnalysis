@@ -12,14 +12,14 @@ clc;
 fprintf('Starting %s.m\n',mfilename('fullpath'));
 
 % System var. point to external folders
-%inputpath = getenv('INPUTDATAPATH');
-%outputpath = getenv('OUTPUTDATAPATH');
+inputpath = getenv('INPUTDATAPATH');
+outputpath = getenv('OUTPUTDATAPATH');
 
-inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
+%inputpath  = '/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/Data/';
+%outputpath = '/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/SonarAnalysis/Results';
 
 % selected version of data
-database = 'DemonRealData';
+database = '4classes';
 
 
 fprintf('Reading Raw data in %s database\n',database);
