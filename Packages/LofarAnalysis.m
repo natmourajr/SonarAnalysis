@@ -20,7 +20,7 @@ inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
 outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
-database = '24classes';
+database = '4classes';
 
 fprintf('Performing Lofar Analysis in %s database\n',database);
 
@@ -32,7 +32,13 @@ end
 dir_info = dir(sprintf('%s/%s',outputpath,database));
 load(sprintf('%s/%s/data_info_file.mat',outputpath,database))
 
-data_info.lofar_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
+m_matlab_version = version('-release');
+matlab_year = str2num(m_matlab_version(1:end-1));
+if(matlab_year < 2016)
+    data_info.lofar_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
+else
+    data_info.lofar_data_date = datestr(now,'dd-mm-yyyy HH:MM:SS');
+end
 
 % get user information
 user_loop = true;

@@ -12,14 +12,14 @@ clc;
 fprintf('Starting %s.m\n',mfilename('fullpath'));
 
 % System var. point to external folders
-%inputpath = getenv('INPUTDATAPATH');
-%outputpath = getenv('OUTPUTDATAPATH');
+inputpath = getenv('INPUTDATAPATH');
+outputpath = getenv('OUTPUTDATAPATH');
 
-inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
+%inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
+%outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
-database = 'DemonRealData';
+database = '4classes';
 
 
 fprintf('Reading Raw data in %s database\n',database);
@@ -44,7 +44,15 @@ data_info.class_labels = {};
 data_info.fs = {};
 data_info.n_runs = {};
 data_info.database = database;
-data_info.raw_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
+
+m_matlab_version = version('-release');
+matlab_year = str2num(m_matlab_version(1:end-1));
+if(matlab_year < 2016)
+    data_info.raw_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
+else
+    data_info.raw_data_date = datestr(now,'dd-mm-yyyy HH:MM:SS');
+end
+
 data_info.username = char(java.lang.System.getProperty('user.name'));
 data_info.computername = char(java.net.InetAddress.getLocalHost.getHostName);
 
