@@ -11,13 +11,20 @@ from sklearn.externals import joblib
 from sklearn import preprocessing
 
 
+from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation
+from keras.optimizers import SGD
+import keras.callbacks as callbacks
+from keras.models import load_model
+
 
 class TrnInformation(object):
-    def __init__(self, date='', n_folds=2, n_inits=2,
+    def __init__(self, date='', n_folds=2, n_inits=2, n_neurons=4,
                  norm='mapstd',verbose=False,
                  train_verbose = False):
         self.n_folds = n_folds
         self.n_inits = n_inits
+        self.n_neurons = n_neurons
         self.norm = norm
         self.verbose = verbose
         self.train_verbose = train_verbose
@@ -33,6 +40,7 @@ class TrnInformation(object):
         print '\tDate %s'%(self.date)
         print '\tNumber of Folds %i'%(self.n_folds)
         print '\tNumber of Initializations: %i'%(self.n_inits)
+        print '\tNumber of Neurons: %i'%(self.n_neurons)
         print '\tNormalization: %s'%(self.norm)
         if self.CVO is None:
             print '\tCVO is None'
@@ -143,6 +151,11 @@ class ClassificationBaseClass(object):
 class NeuralClassification(ClassificationBaseClass):
     def preprocess(self, data, trgt, trn_info=None,fold=0):
         print 'NeuralClassication preprocess function'
+        
+        if fold > trn_info.n_folds or fold < -1:
+            print 'Invalid Fold...'
+            return None
+        
         if self.trn_info is None and trn_info is None:
             print 'No TrnInformation'
             return -1
@@ -176,15 +189,96 @@ class NeuralClassification(ClassificationBaseClass):
             elif self.trn_info.norm == 'mapminmax':
                 scaler = preprocessing.MinMaxScaler().fit(data[train_id,:])
             joblib.dump([scaler],file_name,compress=9)
+            self.preproc_done = True
         else:
-            print 'NeuralClassication preprocess function: loading scaler for fold %i'%(fold)
+            #print 'NeuralClassication preprocess function: loading scaler for fold %i'%(fold)
             [scaler] = joblib.load(file_name)
         
         data_proc = scaler.transform(data)
 
-        # other preprocessing
+        # others preprocessing process
 
         return [data_proc,trgt]
             
-    def train(self, data, trgt):
-        return -1
+    def train(self, data, trgt, n_neurons=4, trn_info=None, fold=0):
+        print 'NeuralClassication train function'
+        
+        if fold > trn_info.n_folds or fold < -1:
+            print 'Invalid Fold...'
+            return None
+        
+        [data_preproc, trgt_preproc] = self.preprocess(data,trgt,
+                                                       trn_info=trn_info,fold=fold)
+                                                       
+        # checar se o arquivo existe
+        file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
+                                                                  self.trn_info.date,
+                                                                  self.name,fold,n_neurons)
+        if not os.path.exists(file_name):
+        
+            best_init = 0
+            best_loss = 999
+            best_model = None
+            best_desc = {}
+        
+            train_id, test_id = self.trn_info.CVO[fold]
+            
+            for i_init in range(self.trn_info.n_inits):
+                print 'Init: %i of %i'%(i_init+1,self.trn_info.n_inits)
+                
+                model = Sequential()
+                model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
+                model.add(Activation('tanh'))
+                model.add(Dense(trgt.shape[1], init="uniform"))
+                model.add(Activation('tanh'))
+        
+                sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+                model.compile(loss='mean_squared_error',
+                              optimizer=sgd,
+                              metrics=['accuracy'])
+            
+                # Train model
+                earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
+                                                        patience=5,
+                                                        verbose=0,
+                                                        mode='auto')
+                                                    
+                init_trn_desc = model.fit(data_preproc[train_id], trgt_preproc[train_id],
+                                          nb_epoch=3,
+                                          batch_size=256,
+                                          callbacks=[earlyStopping],
+                                          verbose=1,
+                                          validation_data=(data_preproc[test_id],
+                                                           trgt_preproc[test_id]),
+                                          shuffle=True)
+        
+                if np.min(init_trn_desc.history['val_loss']) < best_loss:
+                    best_init = i_init
+                    best_loss = np.min(init_trn_desc.history['val_loss'])
+                    best_model = model
+                    best_desc['epochs'] = init_trn_desc.epoch
+                    best_desc['acc'] = init_trn_desc.history['acc']
+                    best_desc['loss'] = init_trn_desc.history['loss']
+                    best_desc['val_loss'] = init_trn_desc.history['val_loss']
+                    best_desc['val_acc'] = init_trn_desc.history['val_acc']
+        
+            # salvar o modelo
+            file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
+                                                                      self.trn_info.date,
+                                                                      self.name,fold,n_neurons)
+            best_model.save(file_name)
+        
+            # salvar o descritor
+            file_name = '%s/%s_%s_train_fold_%i_neurons_%i_trn_desc.h5'%(self.preproc_path,
+                                                                         self.trn_info.date,
+                                                                         self.name,fold,n_neurons)
+            joblib.dump([best_desc],file_name,compress=9)
+        else:
+            # salvar o modelo
+            file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
+                                                                      self.trn_info.date,
+                                                                      self.name,fold,n_neurons)
+            best_model = load_model(file_name)
+        
+        
+        return 0
