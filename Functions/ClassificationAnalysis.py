@@ -9,6 +9,7 @@ import numpy as np
 from sklearn import cross_validation
 from sklearn.externals import joblib
 from sklearn import preprocessing
+from sklearn.metrics import confusion_matrix
 
 
 from keras.models import Sequential
@@ -18,6 +19,11 @@ import keras.callbacks as callbacks
 from keras.models import load_model
 
 import matplotlib.pyplot as plt
+
+plt.rcParams['xtick.labelsize'] = 15
+plt.rcParams['ytick.labelsize'] = 15
+plt.rc('legend',**{'fontsize':15})
+plt.rc('font', weight='bold')
 
 class TrnInformation(object):
     def __init__(self, date='', n_folds=2, n_inits=2,
@@ -327,6 +333,7 @@ class NeuralClassification(ClassificationBaseClass):
     def analysis(self, data, trgt, trn_info=None, n_neurons=1, fold=0):
         print 'NeuralClassication analysis function'
         #self.analysis_output_hist(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+        #self.analysis_top_sweep(self, data, trgt, trn_info=trn_info, min_neurons=1, max_neurons=15)
         return 0
     
     def analysis_output_hist(self, data, trgt, trn_info=None, n_neurons=1, fold=0):
@@ -343,8 +350,8 @@ class NeuralClassification(ClassificationBaseClass):
             joblib.dump([output],file_name,compress=9)
         else:
             [output] = joblib.load(file_name)
-        
-        fig, ax = plt.subplots(figsize=(20,20),nrows=trgt.shape[1], ncols=output.shape[1])
+    
+        fig, ax = plt.subplots(figsize=(10,10),nrows=trgt.shape[1], ncols=output.shape[1])
         
         m_colors = ['b', 'r', 'g', 'y']
         m_bins = np.linspace(-1.5, 1.5, 50)
@@ -379,6 +386,7 @@ class NeuralClassification(ClassificationBaseClass):
             acc_vector = np.zeros([self.trn_info.n_folds,max_neurons+1])
             for ineuron in xrange(min_neurons,max_neurons+1):
                 for ifold in range(self.trn_info.n_folds):
+                    
                     [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=ineuron,fold=ifold)
                     acc_vector[ifold, ineuron] = np.min(trn_desc['val_loss'])
 
@@ -392,6 +400,92 @@ class NeuralClassification(ClassificationBaseClass):
                     color='k',alpha=0.7,linewidth=2.5)
         ax.set_ylabel('Acc',fontweight='bold',fontsize=15)
         ax.set_xlabel('Neurons',fontweight='bold',fontsize=15)
+        ax.grid()
+        ax.xaxis.set_ticks(xtick)
         
         return fig
+
+    def analysis_train(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
+        print 'NeuralClassication analysis output hist function'
+        # checar se a analise ja foi feita
+        file_name = '%s/%s_%s_analysis_trn_desc_fold_%i_neurons_%i.jbl'%(self.anal_path,
+                                                                         self.trn_info.date,
+                                                                         self.name,fold,
+                                                                         n_neurons)
+
+        trn_desc = None
+        if not os.path.exists(file_name):
+            [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+            joblib.dump([trn_desc],file_name,compress=9)
+        else:
+            [trn_desc] = joblib.load(file_name)
+
+        fig, ax = plt.subplots(figsize=(10,10),nrows=1, ncols=1)
+
+        ax.plot(trn_desc['epochs'],trn_desc['loss'],color=[0,0,1],
+                linewidth=2.5,linestyle='solid',label='Train Perf.')
+
+        ax.plot(trn_desc['epochs'],trn_desc['val_loss'],color=[1,0,0],
+                linewidth=2.5,linestyle='dashed',label='Val Perf.')
+
+        ax.set_ylabel('MSE',fontweight='bold',fontsize=15)
+        ax.set_xlabel('Epochs',fontweight='bold',fontsize=15)
+        
+        ax.grid()
+        plt.legend()
+
+        return fig
+
+
+    def analysis_conf_mat(self,data,trgt,trn_info=None, class_labels=None, n_neurons=1,fold=0):
+        print 'NeuralClassication analysis analysis conf mat function'
+        file_name = '%s/%s_%s_analysis_model_output_fold_%i_neurons_%i.jbl'%(self.anal_path,
+                                                                             self.trn_info.date,
+                                                                             self.name,fold,
+                                                                             n_neurons)
+        output = None
+        if not os.path.exists(file_name):
+            [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+            output = model.predict(data)
+            joblib.dump([output],file_name,compress=9)
+        else:
+            [output] = joblib.load(file_name)
+
+        fig, ax = plt.subplots(figsize=(10,10),nrows=1, ncols=1)
+
+
+        train_id, test_id = self.trn_info.CVO[fold]
+
+        num_output = np.argmax(output,axis=1)
+        num_tgrt = np.argmax(trgt,axis=1)
+
+        cm = confusion_matrix(num_tgrt[test_id], num_output[test_id])
+        cm_normalized = 100.*cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        im =ax.imshow(cm_normalized, interpolation='nearest', cmap=plt.cm.Greys,clim=(0.0, 100.0))
+
+        width, height = cm_normalized.shape
+
+        for x in xrange(width):
+            for y in xrange(height):
+                if cm_normalized[x][y] < 50.:
+                    ax.annotate('%1.3f%%'%(cm_normalized[x][y]), xy=(y, x),
+                                horizontalalignment='center',
+                                verticalalignment='center')
+                else:
+                    ax.annotate('%1.3f%%'%(cm_normalized[x][y]), xy=(y, x),
+                                horizontalalignment='center',
+                                verticalalignment='center',color='white')
+        ax.set_title('Confusion Matrix',fontweight='bold',fontsize=15)
+        fig.colorbar(im)
+        if not class_labels is None:
+            tick_marks = np.arange(len(class_labels))
+            ax.xaxis.set_ticks(tick_marks)
+            ax.xaxis.set_ticklabels(class_labels)
+
+            ax.yaxis.set_ticks(tick_marks)
+            ax.yaxis.set_ticklabels(class_labels)
+
+        return fig
+
+
 
