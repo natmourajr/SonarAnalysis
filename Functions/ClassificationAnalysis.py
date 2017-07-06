@@ -215,7 +215,6 @@ class NeuralClassification(ClassificationBaseClass):
                                                                   self.trn_info.date,
                                                                   self.name,fold,n_neurons)
         if not os.path.exists(file_name):
-        
             best_init = 0
             best_loss = 999
             best_model = None
@@ -239,7 +238,7 @@ class NeuralClassification(ClassificationBaseClass):
             
                 # Train model
                 earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
-                                                        patience=5,
+                                                        patience=10,
                                                         verbose=0,
                                                         mode='auto')
                                                     
@@ -273,12 +272,5 @@ class NeuralClassification(ClassificationBaseClass):
                                                                          self.trn_info.date,
                                                                          self.name,fold,n_neurons)
             joblib.dump([best_desc],file_name,compress=9)
-        else:
-            # salvar o modelo
-            file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
-                                                                      self.trn_info.date,
-                                                                      self.name,fold,n_neurons)
-            best_model = load_model(file_name)
-        
         
         return 0
