@@ -405,8 +405,8 @@ class NeuralClassification(ClassificationBaseClass):
         
         return fig
 
-    def analysis_train(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
-        print 'NeuralClassication analysis output hist function'
+    def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
+        print 'NeuralClassication analysis train plot function'
         # checar se a analise ja foi feita
         file_name = '%s/%s_%s_analysis_trn_desc_fold_%i_neurons_%i.jbl'%(self.anal_path,
                                                                          self.trn_info.date,

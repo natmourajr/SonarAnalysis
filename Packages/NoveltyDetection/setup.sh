@@ -14,11 +14,11 @@ if [ -z "$SONAR_WORKSPACE" ]; then
     return
 fi  
 
+export MY_OLD_PATH=$PWD
+
 source $SONAR_WORKSPACE/setup.sh
 
-export MY_PATH=$PWD
-
-export PACKAGE_OUTPUT=$OUTPUTDATAPATH/NoveltyDetection
+export PACKAGE_NAME=$OUTPUTDATAPATH/NoveltyDetection
 
 # Folder Configuration
 if [ -d "$OUTPUTDATAPATH/NoveltyDetection" ]; then
@@ -27,17 +27,15 @@ if [ -d "$OUTPUTDATAPATH/NoveltyDetection" ]; then
     	echo
         echo "creating OUTPUTDATAPATH struct"
         echo
-        rm -rf $PACKAGE_OUTPUT
-        mkdir $PACKAGE_OUTPUT
+        rm -rf $PACKAGE_NAME
+        mkdir $PACKAGE_NAME
         cd $SONAR_WORKSPACE/Packages/NoveltyDetection
         for i in $(ls -d */); do 
-    		mkdir $PACKAGE_OUTPUT/${i%%/}; 
-    		mkdir $PACKAGE_OUTPUT/${i%%/}/picts;
-    		mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
-    		mkdir $PACKAGE_OUTPUT/${i%%/}/result_files; 
-    		mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files;
+    		mkdir $PACKAGE_NAME/${i%%/};
+    		mkdir $PACKAGE_NAME/${i%%/}/pictures_files;
+    		mkdir $PACKAGE_NAME/${i%%/}/output_files;
     	done
-        cd $MY_PATH
+        cd $MY_OLD_PATH
     else
     	echo
     	echo "Only Export Env Variables"
@@ -49,16 +47,14 @@ else
     echo "OUTPUTDATAPATH: $OUTPUTDATAPATH doesnt exists"
     echo "creating OUTPUTDATAPATH/NoveltyDetection struct"
     echo
-    rm -rf $PACKAGE_OUTPUT
-    mkdir $PACKAGE_OUTPUT
+    rm -rf $PACKAGE_NAME
+    mkdir $PACKAGE_NAME
     cd $SONAR_WORKSPACE/Packages/NoveltyDetection
     for i in $(ls -d */); do 
-    	mkdir $PACKAGE_OUTPUT/${i%%/}; 
-    	mkdir $PACKAGE_OUTPUT/${i%%/}/picts; 
-    	mkdir $PACKAGE_OUTPUT/${i%%/}/classifiers_files;
-    	mkdir $PACKAGE_OUTPUT/${i%%/}/result_files;
-    	mkdir $PACKAGE_OUTPUT/${i%%/}/train_info_files; 
+    	mkdir $PACKAGE_NAME/${i%%/};
+    	mkdir $PACKAGE_NAME/${i%%/}/pictures_files;
+    	mkdir $PACKAGE_NAME/${i%%/}/output_files;
     done
-    cd $MY_PATH
+    cd $MY_OLD_PATH
 fi
 
