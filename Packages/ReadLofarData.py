@@ -22,7 +22,12 @@ from sklearn.externals import joblib
 print 'Starting '+os.path.basename(__file__)
 
 # System var. point to external folders
+<<<<<<< HEAD
 datapath = os.getenv('OUTPUTDATAPATH')
+=======
+# datapath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results'
+datapath = os.environ.get('OUTPUTDATAPATH')
+>>>>>>> 09b56333b37fc3a24db15579d84d25af4e963a71
 
 # Variable to chance Database
 database = "4classes"

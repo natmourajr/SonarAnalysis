@@ -14,10 +14,11 @@ addpath('../Functions/SonarFunctions');
 fprintf('Starting %s.m\n',mfilename('fullpath'));
 
 % System var. point to external folders
-%outputpath = getenv('OUTPUTDATAPATH');
+outputpath = getenv('OUTPUTDATAPATH');
+inputpath  = getenv('INPUTDATAPATH');
 
-inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
+%inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
+%outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
 database = '4classes';

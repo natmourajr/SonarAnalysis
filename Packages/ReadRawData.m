@@ -15,8 +15,13 @@ fprintf('Starting %s.m\n',mfilename('fullpath'));
 inputpath = getenv('INPUTDATAPATH');
 outputpath = getenv('OUTPUTDATAPATH');
 
+<<<<<<< HEAD
 %inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
 %outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
+=======
+%inputpath  = '/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/Data/';
+%outputpath = '/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/SonarAnalysis/Results';
+>>>>>>> 09b56333b37fc3a24db15579d84d25af4e963a71
 
 % selected version of data
 database = '4classes';
