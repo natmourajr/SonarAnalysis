@@ -9,28 +9,29 @@ import numpy as np
 from sklearn import cross_validation
 from sklearn.externals import joblib
 from sklearn import preprocessing
-
+from sklearn.metrics import confusion_matrix
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
-from keras.optimizers import SGD
+from keras.optimizers import Adam
 import keras.callbacks as callbacks
 from keras.models import load_model
 
 import matplotlib.pyplot as plt
 
 class TrnInformation(object):
-    def __init__(self, date='', n_folds=2, n_inits=2,
-                 norm='mapstd',
-                 verbose=False,
+    def __init__(self, date = '', n_folds = 2, n_inits = 2,
+                 norm = 'mapstd',
+                 verbose = False,
                  train_verbose = False,
-                 n_epochs=10,
-                 learning_rate=0.01,
-                 learning_decay=1e-6,
-                 momentum=0.3,
-                 nesterov=True,
-                 patience=5,
-                 batch_size=4):
+                 n_epochs = 10,
+                 learning_rate = 0.001,
+                 learning_decay = 0.0,
+		 beta_1 = 0.9,
+		 beta_2 = 0.999,
+		 epsilon = 1e-08,
+                 patience = 5,
+                 batch_size = 4):
         
         self.n_folds = n_folds
         self.n_inits = n_inits
@@ -38,13 +39,13 @@ class TrnInformation(object):
         self.verbose = verbose
         self.train_verbose = train_verbose
         
-        
         # train params
         self.n_epochs = n_epochs
         self.learning_rate = learning_rate
         self.learning_decay = learning_decay
-        self.momentum = momentum
-        self.nesterov = nesterov
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
+	self.epsilon = epsilon
         self.patience = patience
         self.batch_size = batch_size
         
@@ -64,15 +65,18 @@ class TrnInformation(object):
             print '\tCVO is None'
         else:
             print '\tCVO is not None'
-        if verbose:
+        if self.verbose:
             print '\tVerbose is True'
         else:
             print '\tVerbose is False'
-        if train_verbose:
+        if self.train_verbose:
             print '\tTrain Verbose is True'
         else:
             print '\tTrain Verbose is False'
-
+#	if self.train_done:
+#	    print '\tTrain is done'
+#	else:
+#	    print '\tTrain is not done'
 
     def SplitTrainSet(self,trgt):
         # divide data in train and test for novelty detection
@@ -93,7 +97,6 @@ class TrnInformation(object):
             print 'No valid path...'
             return -1
         [self.date,self.n_folds, self.n_inits, self.norm, self.CVO] = joblib.load(path)
-
 
 class ClassificationBaseClass(object):
     
@@ -163,16 +166,14 @@ class ClassificationBaseClass(object):
             self.preprocess(data,trgt)
         
         # train process
-        
         self.training_done = True
 
     def analysis(self, data, trgt):
         print 'ClassificationAnalysis analysis function'
         if not self.training_done:
             self.train(data,trgt)
-        
+     
         # analysis process
-
         self.analysis_done = True
 
 class NeuralClassification(ClassificationBaseClass):
@@ -184,7 +185,7 @@ class NeuralClassification(ClassificationBaseClass):
             return None
         
         if self.trn_info is None and trn_info is None:
-            # checar se existe o arquivo
+            # Check if the file exist
             file_name = '%s/%s_%s_trn_info.jbl'%(self.preproc_path,self.trn_info.date,self.name)
         
             if not os.path.exists(file_name):
@@ -195,7 +196,7 @@ class NeuralClassification(ClassificationBaseClass):
         else:
             if not trn_info is None:
                 self.trn_info = trn_info
-                # checar se existe o arquivo
+            	# Check if the file exist
                 file_name = '%s/%s_%s_trn_info.jbl'%(self.preproc_path,
                                                      self.trn_info.date,
                                                      self.name)
@@ -208,7 +209,7 @@ class NeuralClassification(ClassificationBaseClass):
 
         train_id, test_id = self.trn_info.CVO[fold]
         
-        # checar se existe o arquivo
+        # Check if the file exist
         file_name = '%s/%s_%s_preproc_fold_%i.jbl'%(self.preproc_path,
                                                     self.trn_info.date,
                                                     self.name,fold)
@@ -224,13 +225,12 @@ class NeuralClassification(ClassificationBaseClass):
             joblib.dump([scaler],file_name,compress=9)
             self.preproc_done = True
         else:
-            #print 'NeuralClassication preprocess function: loading scaler for fold %i'%(fold)
+            print 'NeuralClassication preprocess function: loading scaler for fold %i'%(fold)
             [scaler] = joblib.load(file_name)
         
         data_proc = scaler.transform(data)
 
         # others preprocessing process
-
         return [data_proc,trgt]
             
     def train(self, data, trgt, n_neurons=1, trn_info=None, fold=0):
@@ -243,7 +243,7 @@ class NeuralClassification(ClassificationBaseClass):
         [data_preproc, trgt_preproc] = self.preprocess(data,trgt,
                                                        trn_info=trn_info,fold=fold)
                                                        
-        # checar se o arquivo existe
+	# Check if the file exists
         file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
                                                                   self.trn_info.date,
                                                                   self.name,fold,n_neurons)
@@ -260,16 +260,18 @@ class NeuralClassification(ClassificationBaseClass):
                 
                 model = Sequential()
                 model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
-                model.add(Activation('tanh'))
+                model.add(Activation('relu'))
                 model.add(Dense(trgt.shape[1], init="uniform"))
-                model.add(Activation('tanh'))
+                model.add(Activation('softmax'))
         
-                sgd = SGD(lr=self.trn_info.learning_rate,
-                          decay=self.trn_info.learning_decay,
-                          momentum=self.trn_info.momentum,
-                          nesterov=self.trn_info.nesterov)
-                model.compile(loss='mean_squared_error',
-                              optimizer=sgd,
+                adam = Adam(lr = self.trn_info.learning_rate,
+                         # decay  = self.trn_info.learning_decay,
+                          beta_1 = self.trn_info.beta_1,
+                          beta_2 = self.trn_info.beta_2,
+			  epsilon = self.trn_info.epsilon)
+                
+		model.compile(loss='mean_squared_error',
+                              optimizer='Adam',
                               metrics=['accuracy'])
             
                 # Train model
@@ -277,7 +279,6 @@ class NeuralClassification(ClassificationBaseClass):
                                                         patience=self.trn_info.patience,
                                                         verbose=self.trn_info.train_verbose,
                                                         mode='auto')
-                                                    
                 init_trn_desc = model.fit(data_preproc[train_id], trgt_preproc[train_id],
                                           nb_epoch=self.trn_info.n_epochs,
                                           batch_size=self.trn_info.batch_size,
@@ -286,7 +287,7 @@ class NeuralClassification(ClassificationBaseClass):
                                           validation_data=(data_preproc[test_id],
                                                            trgt_preproc[test_id]),
                                           shuffle=True)
-        
+        	
                 if np.min(init_trn_desc.history['val_loss']) < best_loss:
                     best_init = i_init
                     best_loss = np.min(init_trn_desc.history['val_loss'])
@@ -297,30 +298,29 @@ class NeuralClassification(ClassificationBaseClass):
                     best_desc['val_loss'] = init_trn_desc.history['val_loss']
                     best_desc['val_acc'] = init_trn_desc.history['val_acc']
         
-            # salvar o modelo
+            # Save the model
             file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.train_path,
                                                                       self.trn_info.date,
                                                                       self.name,fold,n_neurons)
             best_model.save(file_name)
         
-            # salvar o descritor
+            # Save the descriptor
             file_name = '%s/%s_%s_train_fold_%i_neurons_%i_trn_desc.jbl'%(self.train_path,
                                                                          self.trn_info.date,
                                                                          self.name,fold,n_neurons)
             joblib.dump([best_desc],file_name,compress=9)
         else:
-            # carregar o modelo
+            # Load the model
             file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.train_path,
                                                                       self.trn_info.date,
                                                                       self.name,fold,n_neurons)
             best_model = load_model(file_name)
         
-            # carregar o descritor
+            # Load the descriptor
             file_name = '%s/%s_%s_train_fold_%i_neurons_%i_trn_desc.jbl'%(self.train_path,
                                                                      self.trn_info.date,
                                                                      self.name,fold,n_neurons)
             [best_desc] = joblib.load(file_name)
-        
         
         return [best_model, best_desc]
             
@@ -331,7 +331,7 @@ class NeuralClassification(ClassificationBaseClass):
     
     def analysis_output_hist(self, data, trgt, trn_info=None, n_neurons=1, fold=0):
         print 'NeuralClassication analysis output hist function'
-        # checar se a analise ja foi feita
+        # Check if the analysis has already been done
         file_name = '%s/%s_%s_analysis_model_output_fold_%i_neurons_%i.jbl'%(self.anal_path,
                                                                             self.trn_info.date,
                                                                             self.name,fold,
@@ -347,7 +347,7 @@ class NeuralClassification(ClassificationBaseClass):
         fig, ax = plt.subplots(figsize=(20,20),nrows=trgt.shape[1], ncols=output.shape[1])
         
         m_colors = ['b', 'r', 'g', 'y']
-        m_bins = np.linspace(-1.5, 1.5, 50)
+        m_bins = np.linspace(-0.5, 1.5, 50)
         
         for i_target in range(trgt.shape[1]):
             for i_output in range(output.shape[1]):
@@ -369,7 +369,7 @@ class NeuralClassification(ClassificationBaseClass):
 
     def analysis_top_sweep(self, data, trgt, trn_info=None, min_neurons=1, max_neurons=2):
         print 'NeuralClassication analysis top sweep function'
-        # checar se a analise ja foi feita
+     	# Check if the analysis has already been done
         file_name = '%s/%s_%s_analysis_top_sweep_min_%i_max_%i.jbl'%(self.anal_path,
                                                                      self.trn_info.date,
                                                                      self.name,
@@ -386,7 +386,7 @@ class NeuralClassification(ClassificationBaseClass):
         else:
             [acc_vector] = joblib.load(file_name)
 
-        fig, ax = plt.subplots(figsize=(10,10),nrows=1, ncols=1)
+        fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
         xtick = range(max_neurons+1)
         ax.errorbar(xtick,np.mean(acc_vector,axis=0),np.std(acc_vector,axis=0),fmt='o-',
                     color='k',alpha=0.7,linewidth=2.5)
@@ -394,4 +394,85 @@ class NeuralClassification(ClassificationBaseClass):
         ax.set_xlabel('Neurons',fontweight='bold',fontsize=15)
         
         return fig
+    def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
+        #print 'NeuralClassication analysis train plot function'
+     	# Check if the analysis has already been done
+        file_name = '%s/%s_%s_analysis_trn_desc_fold_%i_neurons_%i.jbl'%(self.anal_path,
+                                                                         self.trn_info.date,
+                                                                         self.name,fold,
+                                                                         n_neurons)
 
+        trn_desc = None
+        if not os.path.exists(file_name):
+            [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+            joblib.dump([trn_desc],file_name,compress=9)
+        else:
+            [trn_desc] = joblib.load(file_name)
+	
+	#print "Results for Fold %i:"%fold
+        fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
+
+        ax.plot(trn_desc['epochs'],trn_desc['loss'],color=[0,0,1],
+                linewidth=2.5,linestyle='solid',label='Train Perf.')
+
+        ax.plot(trn_desc['epochs'],trn_desc['val_loss'],color=[1,0,0],
+                linewidth=2.5,linestyle='dashed',label='Val Perf.')
+
+        ax.set_ylabel('MSE',fontweight='bold',fontsize=15)
+        ax.set_xlabel('Epochs',fontweight='bold',fontsize=15)
+        
+        ax.grid()
+        plt.legend()
+
+        return None
+
+    def analysis_conf_mat(self,data,trgt,trn_info=None, class_labels=None, n_neurons=1,fold=0):
+        #print 'NeuralClassication analysis analysis conf mat function'
+        file_name = '%s/%s_%s_analysis_model_output_fold_%i_neurons_%i.jbl'%(self.anal_path,
+                                                                             self.trn_info.date,
+                                                                             self.name,fold,
+                                                                             n_neurons)
+        output = None
+        # Check if the file exists
+	if not os.path.exists(file_name):
+	    #If the file doesn't exists, train new model and save it
+            [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+            output = model.predict(data)
+            joblib.dump([output],file_name,compress=9)
+        else:
+            [output] = joblib.load(file_name)
+	#print "Results for Fold %i:"%fold
+        fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
+
+        train_id, test_id = self.trn_info.CVO[fold]
+        num_output = np.argmax(output,axis=1)
+        num_tgrt = np.argmax(trgt,axis=1)
+
+        cm = confusion_matrix(num_tgrt[test_id], num_output[test_id])
+        cm_normalized = 100.*cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        im = ax.imshow(cm_normalized, interpolation='nearest', cmap=plt.cm.Greys,clim=(0.0, 100.0))
+
+        width, height = cm_normalized.shape
+
+        for x in xrange(width):
+            for y in xrange(height):
+                if cm_normalized[x][y] < 50.:
+                    ax.annotate('%1.3f%%'%(cm_normalized[x][y]), xy = (y, x),
+                                horizontalalignment='center',
+                                verticalalignment='center')
+                else:
+                    ax.annotate('%1.3f%%'%(cm_normalized[x][y]), xy = (y, x),
+                                horizontalalignment = 'center',
+                                verticalalignment = 'center',color = 'white')
+        ax.set_title('Confusion Matrix',fontweight = 'bold',fontsize = 15)
+        fig.colorbar(im)
+        if not class_labels is None:
+            tick_marks = np.arange(len(class_labels))
+            ax.xaxis.set_ticks(tick_marks)
+            ax.xaxis.set_ticklabels(class_labels)
+
+            ax.yaxis.set_ticks(tick_marks)
+            ax.yaxis.set_ticklabels(class_labels)
+	ax.set_ylabel('True Label', fontweight = 'bold', fontsize = 15)
+	ax.set_xlabel('Predicted Label', fontweight = 'bold', fontsize = 15)
+	return None

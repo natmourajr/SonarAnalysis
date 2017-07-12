@@ -62,6 +62,5 @@ else
         # mkdir $PACKAGE_NAME/${i%%/}/classifiers_files;
         # mkdir $PACKAGE_NAME/${i%%/}/train_info_files;
     done
-    cd $MY_PATH
 fi
 

@@ -26,8 +26,8 @@ elif [[ "$USER" == "vinicius.mello" ]]; then
     # vinicius.mello user
     if [[ "$OSTYPE" == "linux-gnu" ]]; then
         # Ubuntu
-        export SONAR_WORKSPACE=/home/natmourajr/Workspace/Doutorado/SonarAnalysis
-        export INPUTDATAPATH=/home/natmourajr/Public/Marinha/Data
+        export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
+        export INPUTDATAPATH=/home/vinicius.mello/Public/Marinha/Data
     fi
 fi
 
