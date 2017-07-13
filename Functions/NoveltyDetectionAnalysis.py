@@ -310,7 +310,7 @@ class SVMNoveltyDetection(NoveltyDetectionBaseClass):
         
         return fig
 
-    def analysis_nu_sweep(self, data, trgt, trn_info=None, min_nu=0.1, max_nu=0.9, nu_step=0.1):
+    def analysis_nu_sweep(self, data, trgt, trn_info=None, min_nu=0.1, max_nu=0.9, nu_step=0.1, num_cores=0):
         print 'SVMNoveltyDetection analysis nu sweep function'
         
         if min_nu < 0.0 or min_nu >1.0:
