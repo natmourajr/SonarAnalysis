@@ -26,6 +26,9 @@ plt.rcParams['ytick.labelsize'] = 15
 plt.rc('legend',**{'fontsize':15})
 plt.rc('font', weight='bold')
 
+from multiprocessing import Pool
+
+
 class TrnInformation(object):
     def __init__(self, date='',
                  novelty_class=0,
@@ -309,8 +312,9 @@ class SVMNoveltyDetection(NoveltyDetectionBaseClass):
                 ax[i_target,i_output].grid()
         
         return fig
-
-    def analysis_nu_sweep(self, data, trgt, trn_info=None, min_nu=0.1, max_nu=0.9, nu_step=0.1, num_cores=0):
+    
+    
+    def analysis_nu_sweep(self, data, trgt, trn_info=None, min_nu=0.1, max_nu=0.9, nu_step=0.1, num_cores=1):
         print 'SVMNoveltyDetection analysis nu sweep function'
         
         if min_nu < 0.0 or min_nu >1.0:
@@ -354,7 +358,6 @@ class SVMNoveltyDetection(NoveltyDetectionBaseClass):
             tri_known_class = np.zeros([qtd_folds,qtd_classes,qtd_nu])
             eff_novelty = np.zeros([qtd_folds,qtd_classes,qtd_nu])
             
-            
             for ifold in range(self.trn_info.n_folds):
                 for i_novelty_class in range(trgt.shape[1]):
                     for i_nu_value in nu_values:
@@ -367,6 +370,7 @@ class SVMNoveltyDetection(NoveltyDetectionBaseClass):
                             if not iclass == i_novelty_class:
                                 output = classifiers[iclass].predict(data)
                                 eff_aux = float(sum(output[trgt_num==iclass]==1))/float(sum(trgt_num==iclass))
+                                eff_known_class[ifold,i_novelty_class,iclass-(iclass>i_novelty_class),i_nu] = eff_aux
                             else:
                                 # novelty detection
                                 output = classifiers[i_novelty_class].predict(data)
@@ -376,7 +380,6 @@ class SVMNoveltyDetection(NoveltyDetectionBaseClass):
                                 # trigger
                                 eff_aux = float(sum(output[trgt_num!=i_novelty_class]==1))/float(sum(trgt_num!=i_novelty_class))
                                 tri_known_class[ifold,i_novelty_class,i_nu_value] = eff_aux
-
             joblib.dump([nu_values,eff_known_class,eff_novelty,tri_known_class],file_name,compress=9)
         else:
             [nu_values,eff_known_class,eff_novelty,tri_known_class] = joblib.load(file_name)
