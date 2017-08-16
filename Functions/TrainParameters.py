@@ -23,7 +23,7 @@ class TrnParams(object):
         
 # classification
 
-def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False):
+def ClassificationFolds(folder,n_folds=2,trgt=None,dev=False, verbose=False):
     if n_folds < 2:
         print 'Invalid number of folds'
         return -1
@@ -34,7 +34,8 @@ def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False):
         file_name = '%s/%i_folds_cross_validation_dev.jbl'%(folder,n_folds)
         
     if not os.path.exists(file_name):
-        print "Creating %s"%(file_name)
+        if verbose:
+            print "Creating %s"%(file_name)
         
         if trgt is None:
             print 'Invalid trgt'
@@ -44,7 +45,8 @@ def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False):
         CVO = list(CVO)
         joblib.dump([CVO],file_name,compress=9)
     else:
-        print "File %s exists"%(file_name)
+        if verbose:
+            print "File %s exists"%(file_name)
         [CVO] = joblib.load(file_name)
     
     return CVO
@@ -65,7 +67,9 @@ class NeuralClassificationTrnParams(TrnParams):
                  nesterov=True,
                  patience=5,
                  batch_size=4,
-                 activation='tanh'):
+                 hidden_activation='tanh',
+                 output_activation='tanh'
+                ):
         self.params = {}
         
         self.params['n_inits'] = n_inits
@@ -81,14 +85,12 @@ class NeuralClassificationTrnParams(TrnParams):
         self.params['nesterov'] = nesterov
         self.params['patience'] = patience
         self.params['batch_size'] = batch_size
-        self.params['activation'] = activation
+        self.params['hidden_activation'] = hidden_activation
+        self.params['output_activation'] = output_activation
         
     def get_params_str(self):
-        param_str = '%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_activation'%(self.params['n_inits'],
-                                                                              self.params['norm'],
-                                                                              self.params['n_epochs'],
-                                                                              self.params['batch_size'],
-                                                                              self.params['activation']
-                                                                             )
+        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation'%
+                     (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
+                      self.params['hidden_activation'],self.params['output_activation']))
         return param_str
         
