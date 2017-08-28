@@ -3,6 +3,7 @@
 """
 
 import os
+import numpy as np
 from sklearn.externals import joblib
 from sklearn import cross_validation
 
@@ -23,7 +24,7 @@ class TrnParams(object):
         
 # classification
 
-def ClassificationFolds(folder,n_folds=2,trgt=None,dev=False, verbose=False):
+def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False, verbose=False):
     if n_folds < 2:
         print 'Invalid number of folds'
         return -1
@@ -93,4 +94,69 @@ class NeuralClassificationTrnParams(TrnParams):
                      (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
                       self.params['hidden_activation'],self.params['output_activation']))
         return param_str
+
+# novelty detection
+
+def NoveltyDetectionFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False):
+    if n_folds < 2:
+        print 'Invalid number of folds'
+        return -1
+    
+    if not dev:
+        file_name = '%s/%i_folds_cross_validation.jbl'%(folder,n_folds)
+    else: 
+        file_name = '%s/%i_folds_cross_validation_dev.jbl'%(folder,n_folds)
+        
+    if not os.path.exists(file_name):
+        if verbose:
+            print "Creating %s"%(file_name)
+        
+        if trgt is None:
+            print 'Invalid trgt'
+            return -1
+        
+        CVO = {}
+        for inovelty,novelty_class in enumerate(np.unique(trgt)):
+            process_trgt = trgt[trgt!=novelty_class]
+            CVO[inovelty] = cross_validation.StratifiedKFold(process_trgt, n_folds)
+            CVO[inovelty] = list(CVO[inovelty])
+        if verbose:
+            print 'Saving in %s'%(file_name)
+            
+        joblib.dump([CVO],file_name,compress=9)
+        
+    else:
+        if verbose:
+            print "Reading from %s"%(file_name)
+            
+        [CVO] = joblib.load(file_name)
+    
+    return CVO
+
+class SVMNoveltyDetectionTrnParams(TrnParams):
+    """
+        SVM Novelty Detection TrnParams
+    """
+    
+    def __init__(self,
+                 norm='mapstd',
+                 gamma=0.01,
+                 kernel='rbf',
+                 verbose=False):
+        self.params = {}
+        
+        self.params['norm'] = norm
+        self.params['verbose'] = verbose
+        self.params['gamma'] = gamma
+        self.params['kernel'] = kernel
+        
+    def get_params_str(self):
+        gamma_str = ('%1.5f'%(self.params['gamma'])).replace('.','_')
+        param_str = ('%s_norm_%s_gamma_%s_kernel'%
+                     (self.params['norm'],gamma_str,self.params['kernel']))
+        return param_str
+
+
+
+
         
