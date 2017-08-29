@@ -17,6 +17,8 @@ from keras.optimizers import Adam
 import keras.callbacks as callbacks
 from keras.models import load_model
 
+from keras import backend as backend
+
 import matplotlib.pyplot as plt
 
 class TrnInformation(object):
@@ -120,10 +122,6 @@ class ClassificationBaseClass(object):
         
         self.date = None
         self.trn_info = None
-
-        self.preproc_done = False
-        self.training_done = False
-        self.analysis_done = False
 
     def Print(self):
         print 'Class %s'%(self.name)
@@ -242,7 +240,6 @@ class NeuralClassification(ClassificationBaseClass):
         
         [data_preproc, trgt_preproc] = self.preprocess(data,trgt,
                                                        trn_info=trn_info,fold=fold)
-                                                       
 	# Check if the file exists
         file_name = '%s/%s_%s_train_fold_%i_neurons_%i_model.h5'%(self.preproc_path,
                                                                   self.trn_info.date,
@@ -260,7 +257,7 @@ class NeuralClassification(ClassificationBaseClass):
                 
                 model = Sequential()
                 model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
-                model.add(Activation('relu'))
+                model.add(Activation('softplus'))
                 model.add(Dense(trgt.shape[1], init="uniform"))
                 model.add(Activation('softmax'))
         
@@ -348,12 +345,12 @@ class NeuralClassification(ClassificationBaseClass):
         
         m_colors = ['b', 'r', 'g', 'y']
         m_bins = np.linspace(-0.5, 1.5, 50)
-        
         for i_target in range(trgt.shape[1]):
             for i_output in range(output.shape[1]):
                 subplot_id = output.shape[1]*i_target+i_output
                 # alvos max esparsos
                 m_pts = output[np.argmax(trgt,axis=1)==i_target,i_output]
+		print m_pts
                 n, bins, patches = ax[i_target,i_output].hist(m_pts,bins=m_bins,
                                                               fc=m_colors[i_target],
                                                               alpha=0.8, normed=1)
@@ -365,7 +362,7 @@ class NeuralClassification(ClassificationBaseClass):
                                                      fontweight='bold',fontsize=15)
                 ax[i_target,i_output].grid()
         
-        return fig
+        return None
 
     def analysis_top_sweep(self, data, trgt, trn_info=None, min_neurons=1, max_neurons=2):
         print 'NeuralClassication analysis top sweep function'
@@ -380,7 +377,7 @@ class NeuralClassification(ClassificationBaseClass):
             for ineuron in xrange(min_neurons,max_neurons+1):
                 for ifold in range(self.trn_info.n_folds):
                     [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=ineuron,fold=ifold)
-                    acc_vector[ifold, ineuron] = np.min(trn_desc['val_loss'])
+                    acc_vector[ifold, ineuron] = np.min(trn_desc['val_acc']) # estava val_loss
 
             joblib.dump([acc_vector],file_name,compress=9)
         else:
@@ -388,12 +385,13 @@ class NeuralClassification(ClassificationBaseClass):
 
         fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
         xtick = range(max_neurons+1)
+	print acc_vector
+	#ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.errorbar(xtick,np.mean(acc_vector,axis=0),np.std(acc_vector,axis=0),fmt='o-',
                     color='k',alpha=0.7,linewidth=2.5)
         ax.set_ylabel('Acc',fontweight='bold',fontsize=15)
         ax.set_xlabel('Neurons',fontweight='bold',fontsize=15)
-        
-        return fig
+        return None
     def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
         #print 'NeuralClassication analysis train plot function'
      	# Check if the analysis has already been done
@@ -433,6 +431,7 @@ class NeuralClassification(ClassificationBaseClass):
                                                                              self.name,fold,
                                                                              n_neurons)
         output = None
+	#If the file doesn't exists, train new model and save it
         # Check if the file exists
 	if not os.path.exists(file_name):
 	    #If the file doesn't exists, train new model and save it
@@ -441,8 +440,10 @@ class NeuralClassification(ClassificationBaseClass):
             joblib.dump([output],file_name,compress=9)
         else:
             [output] = joblib.load(file_name)
+
 	#print "Results for Fold %i:"%fold
-        fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
+
+	fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
 
         train_id, test_id = self.trn_info.CVO[fold]
         num_output = np.argmax(output,axis=1)
@@ -476,3 +477,21 @@ class NeuralClassification(ClassificationBaseClass):
 	ax.set_ylabel('True Label', fontweight = 'bold', fontsize = 15)
 	ax.set_xlabel('Predicted Label', fontweight = 'bold', fontsize = 15)
 	return None
+    def accuracy(self, data, trgt, trn_info=None, threshold=0.5, n_neurons=1, fold=0):
+        file_name = '%s/%s_%s_analysis_model_output_fold_%i_neurons_%i.jbl'%(self.anal_path,
+                                                                             self.trn_info.date,
+                                                                             self.name,fold,
+                                                                             n_neurons)
+        output = None
+	#If the file doesn't exists, train new model and save it
+        # Check if the file exists
+	if not os.path.exists(file_name):
+	    #If the file doesn't exists, train new model and save it
+            [model,trn_desc] = self.train(data,trgt,trn_info=trn_info,n_neurons=n_neurons,fold=fold)
+            output = model.predict(data)
+            joblib.dump([output],file_name,compress=9)
+        else:
+            [output] = joblib.load(file_name)
+
+	return K.mean(K.equal(trgt, K.lesser(output, threshold)))
+	

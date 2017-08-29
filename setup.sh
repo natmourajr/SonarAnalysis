@@ -7,7 +7,6 @@
 
 # Env Variables
 
-<<<<<<< HEAD
 if [[ "$USER" == "natmourajr" ]]; then
     # natmourajr user
     if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -25,27 +24,12 @@ if [[ "$USER" == "natmourajr" ]]; then
     fi
 elif [[ "$USER" == "vinicius.mello" ]]; then
     # vinicius.mello user
-    if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
         # Ubuntu
         export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
         export INPUTDATAPATH=/home/vinicius.mello/Public/Marinha/Data
     fi
-=======
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    # Ubuntu
-    export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
-    export INPUTDATAPATH=/home/vinicius.mello/Workspace/Data
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    # Mac OSX
-    export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/SonarAnalysis
-    export INPUTDATAPATH=/home/vinicius.mello/Workspace/IniciacaoCientificaLPS/Data
-    
-    # For matplotlib
-	export LC_ALL=en_US.UTF-8
-	export LANG=en_US.UTF-8
->>>>>>> 09b56333b37fc3a24db15579d84d25af4e963a71
-fi
-
+fi    
 export OUTPUTDATAPATH=$SONAR_WORKSPACE/Results
 export PYTHONPATH=$SONAR_WORKSPACE:$PYTHONPATH
 
