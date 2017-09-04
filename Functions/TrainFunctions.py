@@ -20,6 +20,7 @@ from keras.optimizers import Adam, SGD
 import keras.callbacks as callbacks
 from keras.utils import np_utils
 from keras.models import load_model
+from keras import backend as K
 
 import multiprocessing
 
@@ -32,9 +33,11 @@ num_process = multiprocessing.cpu_count()
     hidden_neurons contains the number of neurons in the sequence: [FirstLayer, SecondLayer, ... ]
 '''
 def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0, 
-                                   n_folds=2, hidden_neurons=[1],
+                                   n_folds=2, hidden_neurons=[],
                                    trn_params=None, save_path='', dev=False):
-    
+    if len(hidden_neurons) == 0:
+        hidden_neurons = [1]
+        
     for i in range(len(hidden_neurons)):
         if hidden_neurons[i] == 0:
             hidden_neurons[i] = 1
@@ -90,7 +93,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
     best_init = 0
     best_loss = 999
 
-    classifier = []
+    classifier = [] 
     trn_desc = {}
 
     for i_init in range(n_inits):
@@ -98,18 +101,18 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                             n_folds, 
                                                             i_init+1,
                                                             n_inits)
-
+        
         # Get the weights of first layer
         previous_model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_str,
-                                                   model_prefix_str,
-                                                   n_folds,
-                                                   params_str,
-                                                   hidden_neurons[0])
+                                                                prefix_str,
+                                                                n_folds,
+                                                                params_str,
+                                                                hidden_neurons[0])
 
         if not dev:
-            file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            file_name = '%s_fold_%i_model.h5'%(previous_model_str, ifold)
         else:
-            file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+            file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str, ifold)
         if not os.path.exists(file_name):
             def trainFold(ifold):
                 ineuron = hidden_neurons[0]
@@ -138,10 +141,10 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
         # Add second hidden layer
         if(len(hidden_neurons) > 1):
             previous_model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_str,
-                                                           model_prefix_str,
-                                                           n_folds,
-                                                           params_str,
-                                                           hidden_neurons[1])
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    hidden_neurons[1])
 
             if not dev:        
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
@@ -169,15 +172,15 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
             second_layer = second_layer_model.layers[0]
             second_layer_weights = second_layer.get_weights()
             
-            model.add(Dense(weights=second_layer_weights, trainable=True))
+            model.add(Dense(hidden_neurons[1], weights=second_layer_weights, trainable=True))
             model.add(Activation(trn_params.params['hidden_activation']))
         # Add third hidden layer    
         if(len(hidden_neurons) > 2):
             previous_model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_str,
-                                                           model_prefix_str,
-                                                           n_folds,
-                                                           params_str,
-                                                           hidden_neurons[2])
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    hidden_neurons[2])
 
             if not dev:        
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
@@ -205,7 +208,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
             third_layer = third_layer_model.layers[0]
             third_layer_weights = third_layer.get_weights()
             
-            model.add(Dense(weights=third_layer_weights, trainable=True))
+            model.add(Dense(hidden_neurons[2], weights=third_layer_weights, trainable=True))
             model.add(Activation(trn_params.params['hidden_activation']))
             
         # Add Output Layer
@@ -349,10 +352,10 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
         if layer == 2:
             # Get the projection of the data from previous layer
             previous_model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_str,
-                                                       model_prefix_str,
-                                                       n_folds,
-                                                       params_str,
-                                                       prev_neurons[0])
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    prev_neurons[0])
             if not dev:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
