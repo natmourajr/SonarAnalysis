@@ -535,3 +535,139 @@ def NeuralTrainFunction(data=None, trgt=None,
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
         joblib.dump([trn_desc],file_name,compress=9)
+
+'''
+    Function used to perform the training of a Classifier and Novelty Detector
+'''       
+def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0, 
+                           ifold=0, n_folds=2, n_neurons=1, 
+                           trn_params=None, save_path='',
+                           verbose=False, dev=False):
+    
+    # turn targets in sparse mode
+    trgt_sparse = np_utils.to_categorical(trgt.astype(int))
+    
+    # load or create cross validation ids
+    CVO = trnparams.NoveltyDetectionFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
+    
+    if n_neurons == 0:
+        n_neurons = 1
+
+    n_folds = len(CVO[0])
+    n_inits = trn_params.params['n_inits']
+    model_prefix_str = 'RawData_%i_novelty'%(inovelty)
+    analysis_path = 'NeuralNetwork'
+    
+    params_str = trn_params.get_params_str()
+    
+    model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_path,
+                                                   model_prefix_str,
+                                                   n_folds,
+                                                   params_str,
+                                                   n_neurons)
+    if not dev:
+        file_name = '%s_%i_fold_model.h5'%(model_str,ifold)
+    else:
+        file_name = '%s_%i_fold_model_dev.h5'%(model_str,ifold)
+        
+    if trn_params.params['verbose']:
+        print file_name
+    
+    # Check if the model has already been trained
+    if not os.path.exists(file_name):
+        if verbose:
+            print 'Train Model'
+        # training
+        
+        classifier = []
+        trn_desc = {}
+        
+        train_id, test_id = CVO[inovelty][ifold]
+
+        # normalize data based in train set
+        if trn_params.params['norm'] == 'mapstd':
+            scaler = preprocessing.StandardScaler().fit(data[train_id,:])
+        elif trn_params.params['norm'] == 'mapstd_rob':
+            scaler = preprocessing.RobustScaler().fit(data[train_id,:])
+        elif trn_params.params['norm'] == 'mapminmax':
+            scaler = preprocessing.MinMaxScaler().fit(data[train_id,:])
+
+        norm_data = scaler.transform(data)
+        
+        best_init = 0
+        best_loss = 999
+        
+        for i_init in range(n_inits):
+            print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons, 
+                                                                             ifold+1, 
+                                                                             n_folds, 
+                                                                             i_init+1,
+                                                                             n_inits)
+            model = Sequential()
+            model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
+            model.add(Activation(trn_params.params['hidden_activation']))
+            model.add(Dense(trgt_sparse.shape[1], init="uniform")) 
+            model.add(Activation(trn_params.params['output_activation']))
+            
+            adam = Adam(lr=trn_params.params['learning_rate'], 
+                    beta_1=trn_params.params['beta_1'],
+                    beta_2=trn_params.params['beta_2'],
+                    epsilon=trn_params.params['epsilon'])
+            
+            model.compile(loss='mean_squared_error', 
+                          optimizer=adam,
+                          metrics=['accuracy'])
+            
+            # Train model
+            earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+                                                    patience=trn_params.params['patience'],
+                                                    verbose=trn_params.params['train_verbose'], 
+                                                    mode='auto')
+
+            init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id], 
+                                      nb_epoch=trn_params.params['n_epochs'], 
+                                      batch_size=trn_params.params['batch_size'],
+                                      callbacks=[earlyStopping], 
+                                      verbose=trn_params.params['verbose'],
+                                      validation_data=(norm_data[test_id],
+                                                       trgt_sparse[test_id]),
+                                      shuffle=True)
+            if np.min(init_trn_desc.history['val_loss']) < best_loss:
+                best_init = i_init
+                best_loss = np.min(init_trn_desc.history['val_loss'])
+                classifier = model
+                trn_desc['epochs'] = init_trn_desc.epoch
+                trn_desc['acc'] = init_trn_desc.history['acc']
+                trn_desc['loss'] = init_trn_desc.history['loss']
+                trn_desc['val_loss'] = init_trn_desc.history['val_loss']
+                trn_desc['val_acc'] = init_trn_desc.history['val_acc']
+                
+        # save model
+        if not dev:        
+            file_name = '%s_%i_fold_model.h5'%(model_str,ifold)
+            classifier.save(file_name)
+            file_name = '%s_%i_fold_trn_desc.jbl'%(model_str,ifold)
+            joblib.dump([trn_desc],file_name,compress=9)
+        else:
+            file_name = '%s_%i_fold_model_dev.h5'%(model_str,ifold)
+            classifier.save(file_name)
+            file_name = '%s_%i_fold_trn_desc_dev.jbl'%(model_str,ifold)
+            joblib.dump([trn_desc],file_name,compress=9)
+    else:
+        # The model has already been trained, so load the files
+        if verbose: 
+            print 'Load Model'
+        classifier = Sequential()
+        if not dev:
+            file_name = '%s_%i_fold_model.h5'%(model_str,ifold)
+        else:
+            file_name = '%s_%i_fold_model_dev.h5'%(model_str,ifold)
+        classifier = load_model(file_name)
+        
+        if not dev:
+            file_name = '%s_%i_fold_trn_desc.jbl'%(model_str,ifold)
+        else:
+            file_name = '%s_%i_fold_trn_desc_dev.jbl'%(model_str,ifold)
+        [trn_desc] = joblib.load(file_name)
+        
+    return [classifier,trn_desc]        

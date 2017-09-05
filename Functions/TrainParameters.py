@@ -3,10 +3,7 @@
 """
 
 import os
-<<<<<<< HEAD
 import numpy as np
-=======
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
 from sklearn.externals import joblib
 from sklearn import cross_validation
 
@@ -27,11 +24,8 @@ class TrnParams(object):
         
 # classification
 
-<<<<<<< HEAD
 def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False, verbose=False):
-=======
-def ClassificationFolds(folder,n_folds=2,trgt=None,dev=False, verbose=False):
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
+
     if n_folds < 2:
         print 'Invalid number of folds'
         return -1
@@ -64,36 +58,24 @@ class NeuralClassificationTrnParams(TrnParams):
         Neural Classification TrnParams
     """
     
-<<<<<<< HEAD
-    def __init__(self, n_inits=2,
-=======
     def __init__(self, 
                  n_inits=2,
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
                  norm='mapstd',
                  verbose=False,
                  train_verbose=False,
                  n_epochs=10,
-<<<<<<< HEAD
-                 learning_rate=0.01,
-=======
                  learning_rate=0.001,
                  beta_1 = 0.9,
                  beta_2 = 0.999,
                  epsilon = 1e-08,
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
                  learning_decay=1e-6,
                  momentum=0.3,
                  nesterov=True,
                  patience=5,
                  batch_size=4,
                  hidden_activation='tanh',
-<<<<<<< HEAD
                  output_activation='tanh'
                 ):
-=======
-                 output_activation='tanh'):
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
         self.params = {}
         
         self.params['n_inits'] = n_inits
@@ -104,12 +86,9 @@ class NeuralClassificationTrnParams(TrnParams):
         # train params
         self.params['n_epochs'] = n_epochs
         self.params['learning_rate'] = learning_rate
-<<<<<<< HEAD
-=======
         self.params['beta_1'] = beta_1
         self.params['beta_2'] = beta_2
         self.params['epsilon'] = epsilon
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
         self.params['learning_decay'] = learning_decay
         self.params['momentum'] = momentum
         self.params['nesterov'] = nesterov
@@ -122,7 +101,6 @@ class NeuralClassificationTrnParams(TrnParams):
         param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation'%
                      (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
                       self.params['hidden_activation'],self.params['output_activation']))
-<<<<<<< HEAD
         return param_str
 
 # novelty detection
@@ -190,10 +168,3 @@ class NNNoveltyDetectionTrnParams(NeuralClassificationTrnParams):
     """
         NN Novelty Detection TrnParams
     """
-    
-
-
-        
-=======
-        return param_str
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
