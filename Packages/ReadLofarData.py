@@ -23,6 +23,7 @@ print 'Starting '+os.path.basename(__file__)
 
 # System var. point to external folders
 datapath = os.getenv('OUTPUTDATAPATH')
+datapath = os.environ.get('OUTPUTDATAPATH')
 
 # Variable to chance Database
 database = "4classes"

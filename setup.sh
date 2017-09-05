@@ -24,13 +24,12 @@ if [[ "$USER" == "natmourajr" ]]; then
     fi
 elif [[ "$USER" == "vinicius.mello" ]]; then
     # vinicius.mello user
-    if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
         # Ubuntu
-        export SONAR_WORKSPACE=/home/natmourajr/Workspace/Doutorado/SonarAnalysis
-        export INPUTDATAPATH=/home/natmourajr/Public/Marinha/Data
+        export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
+        export INPUTDATAPATH=/home/vinicius.mello/Public/Marinha/Data
     fi
-fi
-
+fi    
 export OUTPUTDATAPATH=$SONAR_WORKSPACE/Results
 export PYTHONPATH=$SONAR_WORKSPACE:$PYTHONPATH
 

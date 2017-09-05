@@ -14,10 +14,11 @@ addpath('../Functions/SonarFunctions');
 fprintf('Starting %s.m\n',mfilename('fullpath'));
 
 % System var. point to external folders
-%outputpath = getenv('OUTPUTDATAPATH');
+outputpath = getenv('OUTPUTDATAPATH');
+inputpath  = getenv('INPUTDATAPATH');
 
-inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
-outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
+%inputpath  = '/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification';
+%outputpath = '/Users/natmourajr/Workspace/Doutorado/SonarAnalysis/Results';
 
 % selected version of data
 database = '4classes';
@@ -34,7 +35,7 @@ load(sprintf('%s/%s/data_info_file.mat',outputpath,database))
 
 m_matlab_version = version('-release');
 matlab_year = str2num(m_matlab_version(1:end-1));
-if(matlab_year < 2016)
+if(matlab_year > 2016)
     data_info.lofar_data_date = datetime('now','TimeZone','local','Format','dd-MMM-yyyy HH:mm:ss');
 else
     data_info.lofar_data_date = datestr(now,'dd-mm-yyyy HH:MM:SS');
