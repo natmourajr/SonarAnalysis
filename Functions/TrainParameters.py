@@ -156,7 +156,11 @@ class SVMNoveltyDetectionTrnParams(TrnParams):
                      (self.params['norm'],gamma_str,self.params['kernel']))
         return param_str
 
-
+class NNNoveltyDetectionTrnParams(NeuralClassificationTrnParams):
+    """
+        NN Novelty Detection TrnParams
+    """
+    
 
 
         
