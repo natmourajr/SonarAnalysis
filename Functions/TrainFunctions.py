@@ -401,9 +401,57 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
             model.add(Dense(proj_all_data.shape[1], init="uniform")) 
             model.add(Activation(trn_params.params['output_activation']))
         # end if layer == 2
+     
+        if layer == 3:
+            # Load first layer model
+            neurons_str = str(data.shape[1])
+            for ineuron in hidden_neurons[:layer-2]:
+                neurons_str = neurons_str + 'x' + str(ineuron)
+            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    neurons_str)
+            if not dev:
+                file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            else:
+                file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+            first_layer_model = load_model(file_name)
+
+            get_first_layer_output = K.function([first_layer_model.layers[0].input],
+                                          [first_layer_model.layers[1].output])
+            
+            # Projection of first layer
+            first_proj_all_data = get_first_layer_output([norm_data])[0]
+
+            # Load second layer model
+            neurons_str = str(data.shape[1])
+            for ineuron in hidden_neurons[:layer-1]:
+                neurons_str = neurons_str + 'x' + str(ineuron)
+            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    neurons_str)
+            if not dev:
+                file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            else:
+                file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+            second_layer_model = load_model(file_name)
+            
+            get_second_layer_output = K.function([second_layer_model.layers[0].input],
+                                          [second_layer_model.layers[1].output])
+            
+            # Projection of second layer
+            second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
         
-        # Layer 3
-        
+            model = Sequential()
+            model.add(Dense(n_neurons, input_dim=second_proj_all_data.shape[1], init="uniform"))
+            model.add(Activation(trn_params.params['hidden_activation']))
+            model.add(Dense(second_proj_all_data.shape[1], init="uniform")) 
+            model.add(Activation(trn_params.params['output_activation']))
         # end if layer == 3
         
         adam = Adam(lr=trn_params.params['learning_rate'], 
@@ -733,21 +781,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
         model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
                                                           prefix_str,n_folds,
                                                           params_str,neurons_str)
-
-
-        if not dev:
-            file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
-            if os.path.exists(file_name):
-                if trn_params.params['verbose']:
-                    print 'File %s exists'%(file_name)
-                return 0
-        else:
-            file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
-            if os.path.exists(file_name):
-                if trn_params.params['verbose']:
-                    print 'File %s exists'%(file_name)
-                return 0
-    if layer == 2:
+    else:
         neurons_str = str(data.shape[1])
         for ineuron in hidden_neurons[:layer]:
             neurons_str = neurons_str + 'x' + str(ineuron)
@@ -756,19 +790,18 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
                                                                 prefix_str,n_folds,
                                                                 params_str,neurons_str)
 
-
-        if not dev:
-            file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
-            if os.path.exists(file_name):
-                if trn_params.params['verbose']:
-                    print 'File %s exists'%(file_name)
-                return 0
-        else:
-            file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
-            if os.path.exists(file_name):
-                if trn_params.params['verbose']:
-                    print 'File %s exists'%(file_name)
-                return 0
+    if not dev:
+        file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
+        if os.path.exists(file_name):
+            if trn_params.params['verbose']:
+                print 'File %s exists'%(file_name)
+            return 0
+    else:
+        file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
+        if os.path.exists(file_name):
+            if trn_params.params['verbose']:
+                print 'File %s exists'%(file_name)
+            return 0
             
     train_id, test_id = CVO[inovelty][ifold]
 
@@ -801,8 +834,10 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             model.add(Activation(trn_params.params['hidden_activation']))
             model.add(Dense(data.shape[1], init="uniform")) 
             model.add(Activation(trn_params.params['output_activation']))
+        # end if layer == 1
+        
         if layer == 2:
-            # Get the projection of the data from previous layer
+            # Load second layer model
             neurons_str = str(data.shape[1])
             for ineuron in hidden_neurons[:layer-1]:
                 neurons_str = neurons_str + 'x' + str(ineuron)
@@ -820,6 +855,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
 
             get_layer_output = K.function([first_layer_model.layers[0].input],
                                           [first_layer_model.layers[1].output])
+            # Projection of first layer
             proj_all_data = get_layer_output([norm_data])[0]
 
             model = Sequential()
@@ -828,9 +864,57 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             model.add(Dense(proj_all_data.shape[1], init="uniform")) 
             model.add(Activation(trn_params.params['output_activation']))
         # end if layer == 2
+     
+        if layer == 3:
+            # Load first layer model
+            neurons_str = str(data.shape[1])
+            for ineuron in hidden_neurons[:layer-2]:
+                neurons_str = neurons_str + 'x' + str(ineuron)
+            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    neurons_str)
+            if not dev:
+                file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            else:
+                file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+            first_layer_model = load_model(file_name)
+
+            get_first_layer_output = K.function([first_layer_model.layers[0].input],
+                                          [first_layer_model.layers[1].output])
+            
+            # Projection of first layer
+            first_proj_all_data = get_first_layer_output([norm_data])[0]
+
+            # Load second layer model
+            neurons_str = str(data.shape[1])
+            for ineuron in hidden_neurons[:layer-1]:
+                neurons_str = neurons_str + 'x' + str(ineuron)
+            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
+                                                                    prefix_str,
+                                                                    n_folds,
+                                                                    params_str,
+                                                                    neurons_str)
+            if not dev:
+                file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            else:
+                file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+            second_layer_model = load_model(file_name)
+            
+            get_second_layer_output = K.function([second_layer_model.layers[0].input],
+                                          [second_layer_model.layers[1].output])
+            
+            # Projection of second layer
+            second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
         
-        # Layer 3
-        
+            model = Sequential()
+            model.add(Dense(n_neurons, input_dim=second_proj_all_data.shape[1], init="uniform"))
+            model.add(Activation(trn_params.params['hidden_activation']))
+            model.add(Dense(second_proj_all_data.shape[1], init="uniform")) 
+            model.add(Activation(trn_params.params['output_activation']))
         # end if layer == 3
         
         adam = Adam(lr=trn_params.params['learning_rate'], 
