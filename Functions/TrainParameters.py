@@ -168,3 +168,8 @@ class NNNoveltyDetectionTrnParams(NeuralClassificationTrnParams):
     """
         NN Novelty Detection TrnParams
     """
+
+class SAENoveltyDetectionTrnParams(NeuralClassificationTrnParams):
+    """
+        SAE Novelty Detection TrnParams
+    """
