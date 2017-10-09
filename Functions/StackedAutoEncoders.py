@@ -1,7 +1,8 @@
-"""
-Author: Vinícius dos Santos Mello <viniciusdsmello@poli.ufrj.br>
-Class created to implement a Stacked Auto Encoder for Classification and Novelty Detection.
-"""
+# -*- coding: utf-8 -*-
+'''
+   Author: Vinícius dos Santos Mello viniciusdsmello at poli.ufrj.br
+   Class created to implement a Stacked Auto Encoder for Classification and Novelty Detection.
+'''
 import os
 import pickle
 import numpy as np
@@ -19,21 +20,20 @@ from keras.utils import np_utils
 from keras.models import load_model
 from keras import backend as K
 
-import multiprocessing
-
 from Functions import TrainParameters as trnparams
+
+import multiprocessing
 
 num_process = multiprocessing.cpu_count()
 
-class StackedAutoEncoder:
-    def __init__(self, trn_params = None, development_flag = False, n_folds = 2, n_inits = 1, save_path='', prefix_str='RawData'):
-        self.trn_params       = trn_params
+class StackedAutoEncoders:
+    def __init__(self, params = None, development_flag = False, n_folds = 2, save_path='', prefix_str='RawData', CVO=None):
+        self.trn_params       = params
         self.development_flag = development_flag
         self.n_folds          = n_folds
-        self.n_inits          = n_inits
         self.save_path        = save_path
         self.prefix_str       = prefix_str
-
+    	self.CVO 	          = CVO
 
         self.n_inits          = self.trn_params.params['n_inits']
         self.params_str       = self.trn_params.get_params_str()
@@ -41,17 +41,17 @@ class StackedAutoEncoder:
     '''
         Method that creates a string in the format: (InputDimension)x(1º Layer Dimension)x...x(Nº Layer Dimension)
     '''
-    def getNeuronsString(self, hidden_neurons=[]):
+    def getNeuronsString(self, data, hidden_neurons=[]):
         neurons_str = str(data.shape[1])
         for ineuron in hidden_neurons:
             neurons_str = neurons_str + 'x' + str(ineuron)
-        neurons_str = neurons_str + 'x' + str(n_neurons)
         return neurons_str
     '''
-        Method that preprocess data normalizing it according to parameter norm.
+        Method that preprocess data normalizing it according to 'norm' parameter.
     '''
-    def normalizeData(self, data, trgt):
-        #normalize data based in train set
+    def normalizeData(self, data, ifold):
+	train_id, test_id = self.CVO[ifold]
+    #normalize data based in train set
         if self.trn_params.params['norm'] == 'mapstd':
             scaler = preprocessing.StandardScaler().fit(data[train_id,:])
         elif self.trn_params.params['norm'] == 'mapstd_rob':
@@ -62,40 +62,109 @@ class StackedAutoEncoder:
         norm_trgt = norm_data
         return norm_data, norm_trgt
     '''
+        Method that returns the output of an intermediate layer.
+    '''
+    def getDataProjection(self, data, trgt, hidden_neurons=[1], layer=1, ifold=0):
+        if layer > len(hidden_neurons):
+            print "[-] Error: The parameter layer must be less or equal to the size of list hidden_neurons"
+            return 1
+        proj_all_data, norm_trgt = self.normalizeData(data=data, ifold=ifold)
+        if layer == 1:
+            neurons_str = self.getNeuronsString(data, hidden_neurons[:layer])
+            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
+                                                                    self.analysis_str,
+                                                                    self.prefix_str,
+                                                                    self.n_folds,
+                                                                    self.params_str,
+                                                                    neurons_str)
+            if not self.development_flag:
+                file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+            else:
+                file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+            # Check if previous layer model was trained
+            if not os.path.exists(file_name):
+                self.trainLayer(data=data, trgt=trgt, ifold=ifold, hidden_neurons = hidden_neurons[:layer], layer=layer, folds_sweep=True)
+
+            layer_model = load_model(file_name)
+
+            get_layer_output = K.function([layer_model.layers[0].input],
+                                          [layer_model.layers[1].output])
+            # Projection of layer
+            proj_all_data = get_layer_output([proj_all_data])[0]
+        elif layer > 1:
+            for ilayer in range(1,layer+1):
+                neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
+                previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
+                                                                        self.analysis_str,
+                                                                        self.prefix_str,
+                                                                        self.n_folds,
+                                                                        self.params_str,
+                                                                        neurons_str)
+                if not self.development_flag:
+                    file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+                else:
+                    file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+                # Check if previous layer model was trained
+                if not os.path.exists(file_name):
+                    self.trainLayer(data=data, trgt=trgt, ifold=ifold, hidden_neurons = hidden_neurons[:ilayer], layer=ilayer, folds_sweep=True)
+
+                layer_model = load_model(file_name)
+
+                get_layer_output = K.function([layer_model.layers[0].input],
+                                              [layer_model.layers[1].output])
+                # Projection of layer
+                proj_all_data = get_layer_output([proj_all_data])[0]
+        return proj_all_data
+
+    '''
         Method used to perform the layerwise algorithm to train the SAE
     '''
-    def trainLayer(self, data=None, trgt=None, ifold=0, hidden_neurons = [400], layer=1):
+    def trainLayer(self, data=None, trgt=None, ifold=0, hidden_neurons = [400], layer=1, folds_sweep=False):
         # Change elements equal to zero to one
         for i in range(len(hidden_neurons)):
             if hidden_neurons[i] == 0:
                 hidden_neurons[i] = 1
-        # load or create cross validation ids
-        CVO = trnparams.ClassificationFolds(folder=save_path,
-                                            n_folds=self.n_folds,
-                                            trgt=trgt,
-                                            dev=self.development_flag)
+        if (layer <= 0) or (layer > len(hidden_neurons)):
+            print "[-] Error: The parameter layer must be greater than zero and less or equal to the length of list hidden_neurons"
+            return -1
 
-        neurons_str = self.getNeuronsString(hidden_neurons[:layer])
-
+        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer])
         model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                       self.prefix_str, n_folds,
-                                                       params_str, neurons_str)
+                                                       self.prefix_str, self.n_folds,
+                                                       self.params_str, neurons_str)
         if not self.development_flag:
             file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
             if os.path.exists(file_name):
                 if self.trn_params.params['verbose']:
                     print 'File %s exists'%(file_name)
-                return 0
+                    classifier = load_model(file_name)
+                    trn_desc   = joblib.load_model
+                return ifold, classifier, trn_desc
         else:
             file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
             if os.path.exists(file_name):
                 if self.trn_params.params['verbose']:
                     print 'File %s exists'%(file_name)
-                return 0
+                # load model
+                classifier = {}
+                trn_desc = {}
+                if not self.development_flag:
+                    file_name  = '%s_fold_%i_model.h5'%(model_str,ifold)
+                    classifier = load_model(file_name)
+                    file_name  = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
+                    trn_desc   = joblib.load(file_name)
+                else:
+                    file_name  = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
+                    classifier = load_model(file_name)
+                    file_name  = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
+                    trn_desc   = joblib.load(file_name)
+                return ifold, classifier, trn_desc
 
-        train_id, test_id = CVO[ifold]
+        train_id, test_id = self.CVO[ifold]
 
-        norm_data, norm_trgt = self.normalizeData(data, trgt)
+        norm_data, norm_trgt = self.normalizeData(data, ifold)
 
         best_init = 0
         best_loss = 999
@@ -103,56 +172,56 @@ class StackedAutoEncoder:
         classifier = []
         trn_desc = {}
 
-        for i_init in range(n_inits):
-            print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(hidden_neurons[layer-1],
-                                                                             ifold+1,
-                                                                             self.n_folds,
-                                                                             i_init+1,
-                                                                             n_inits)
+        for i_init in range(self.n_inits):
+            print 'Layer: %i - Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(layer,
+                                                                                         hidden_neurons[layer-1],
+                                                                                         ifold+1,
+                                                                                         self.n_folds,
+                                                                                         i_init+1,
+                                                                                         self.n_inits)
+            model = Sequential()
+            proj_all_data = norm_data
             if layer == 1:
-                model = Sequential()
                 model.add(Dense(hidden_neurons[layer-1], input_dim=data.shape[1], init="uniform"))
-                model.add(Activation(trn_params.params['hidden_activation']))
-                model.add(Dense(data.shape[1], init="uniform"))
-                model.add(Activation(trn_params.params['output_activation']))
-            else if layer > 1:
-                ilayer = 1
-                while(ilayer <= layer):
-                    neurons_str = self.getNeuronsString(hidden_neurons[:ilayer])
-                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
-                                                                            self.analysis_str,
-                                                                            self.prefix_str,
-                                                                            self.n_folds,
-                                                                            params_str,
-                                                                            neurons_str)
-                    if not dev:
-                        file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
-                    else:
-                        file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
-
-                    layer_model = load_model(file_name)
-
-                    get_layer_output = K.function([layer_model.layers[0].input],
-                                                  [layer_model.layers[1].output])
-                    if(ilayer == 1):
-                        proj_all_data = norm_data
-                    # Projection of layer
-                    proj_all_data = get_layer_output([proj_all_data])[0]
-                model = Sequential()
-                model.add(Dense(hidden_neurons[layer], input_dim=proj_all_data.shape[1], init="uniform"))
                 model.add(Activation(self.trn_params.params['hidden_activation']))
-                model.add(Dense(proj_all_data.shape[1], init="uniform"))
+                model.add(Dense(data.shape[1], init="uniform"))
                 model.add(Activation(self.trn_params.params['output_activation']))
-                norm_data = proj_all_data
-            else:
-                print "Error: Invalid number of layer. It must be equal or greater than 1"
+    	    elif layer > 1:
+                    for ilayer in range(1,layer):
+                        neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
+                        previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
+                                                                                self.analysis_str,
+                                                                                self.prefix_str,
+                                                                                self.n_folds,
+                                                                                self.params_str,
+                                                                                neurons_str)
+                        if not self.development_flag:
+                            file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
+                        else:
+                            file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
+
+                        # Check if previous layer model was trained
+                        if not os.path.exists(file_name):
+                            self.trainLayer(data=data, trgt=trgt, ifold=ifold, hidden_neurons = hidden_neurons[:ilayer], layer=ilayer, folds_sweep=True)
+
+                        layer_model = load_model(file_name)
+
+                        get_layer_output = K.function([layer_model.layers[0].input],
+                                                      [layer_model.layers[1].output])
+                        # Projection of layer
+                        proj_all_data = get_layer_output([proj_all_data])[0]
+
+            model.add(Dense(hidden_neurons[layer-1], input_dim=proj_all_data.shape[1], init="uniform"))
+            model.add(Activation(self.trn_params.params['hidden_activation']))
+            model.add(Dense(proj_all_data.shape[1], init="uniform"))
+            model.add(Activation(self.trn_params.params['output_activation']))
+            norm_data = proj_all_data
 
             # Optimizer
             adam = Adam(lr=self.trn_params.params['learning_rate'],
                         beta_1=self.trn_params.params['beta_1'],
                         beta_2=self.trn_params.params['beta_2'],
                         epsilon=self.trn_params.params['epsilon'])
-
             model.compile(loss='mean_squared_error',
                           optimizer=adam,
                           metrics=['accuracy'])
@@ -192,26 +261,68 @@ class StackedAutoEncoder:
             classifier.save(file_name)
             file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
             joblib.dump([trn_desc],file_name,compress=9)
+        return ifold, classifier, trn_desc
+
+    '''
+        Method that return the classifier according to topology parsed
+    '''
+    def loadClassifier(self, data=None, trgt=None, hidden_neurons=[1], layer=1, ifold=0):
+        for i in range(len(hidden_neurons)):
+            if hidden_neurons[i] == 0:
+                hidden_neurons[i] = 1
+        if (layer <= 0) or (layer > len(hidden_neurons)):
+            print "[-] Error: The parameter layer must be greater than zero and less or equal to the length of list hidden_neurons"
+            return -1
+
+        # Turn trgt to one-hot encoding
+        trgt_sparse = np_utils.to_categorical(trgt.astype(int))
+
+        # load model
+        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
+        model_str = '%s/%s/Classification_(%s)_%s_%i_folds_%s'%(self.save_path,
+                                                                self.analysis_str,
+                                                                neurons_str,
+                                                                self.prefix_str,
+                                                                self.n_folds,
+                                                                self.params_str)
+
+        classifier = {}
+        if not self.development_flag:
+            file_name  = '%s_fold_%i_model.h5'%(model_str,ifold)
+            try:
+                classifier = load_model(file_name)
+            except:
+                print '[-] Error: File or Directory not found'
+        else:
+            file_name  = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
+            try:
+                classifier = load_model(file_name)
+            except:
+                print '[-] Error: File or Directory not found'
+        return classifier
 
     '''
         Function used to do a Fine Tuning in Stacked Auto Encoder for Classification of the data
         hidden_neurons contains the number of neurons in the sequence: [FirstLayer, SecondLayer, ... ]
     '''
-    def trainClassifier(data=None, trgt=None, ifold=0, hidden_neurons=[400], layer=1):
+    def trainClassifier(self, data=None, trgt=None, ifold=0, hidden_neurons=[1], layer=1):
         for i in range(len(hidden_neurons)):
             if hidden_neurons[i] == 0:
                 hidden_neurons[i] = 1
+        if (layer <= 0) or (layer > len(hidden_neurons)):
+            print "[-] Error: The parameter layer must be greater than zero and less or equal to the length of list hidden_neurons"
+            return -1
 
         # Turn trgt to one-hot encoding
         trgt_sparse = np_utils.to_categorical(trgt.astype(int))
 
         # load or create cross validation ids
-        CVO = self.trnparams.ClassificationFolds(folder=self.save_path,
-                                                 n_folds=self.n_folds,
-                                                 trgt=trgt,
-                                                 dev=self.development_flag)
+        CVO = trnparams.ClassificationFolds(folder=self.save_path,
+                                            n_folds=self.n_folds,
+                                            trgt=trgt,
+                                            dev=self.development_flag)
 
-        neurons_str = self.getNeuronsString(hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
+        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
         model_str = '%s/%s/Classification_(%s)_%s_%i_folds_%s'%(self.save_path,
                                                                 self.analysis_str,
                                                                 neurons_str,
@@ -223,17 +334,33 @@ class StackedAutoEncoder:
             if os.path.exists(file_name):
                 if self.trn_params.params['verbose']:
                     print 'File %s exists'%(file_name)
-                return 0
+                    classifier = load_model(file_name)
+                    trn_desc   = joblib.load_model
+                return ifold, classifier, trn_desc
         else:
             file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
             if os.path.exists(file_name):
                 if self.trn_params.params['verbose']:
                     print 'File %s exists'%(file_name)
-                return 0
+                # load model
+                classifier = {}
+                trn_desc = {}
+                if not self.development_flag:
+                    file_name  = '%s_fold_%i_model.h5'%(model_str,ifold)
+                    classifier = load_model(file_name)
+                    file_name  = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
+                    trn_desc   = joblib.load(file_name)
+                else:
+                    file_name  = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
+                    classifier = load_model(file_name)
+                    file_name  = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
+                    trn_desc   = joblib.load(file_name)
+                return ifold, classifier, trn_desc
+
 
         train_id, test_id = CVO[ifold]
 
-        norm_data, norm_trgt = self.normalizeData(data, trgt)
+        norm_data, norm_trgt = self.normalizeData(data, ifold)
 
         best_init = 0
         best_loss = 999
@@ -250,9 +377,9 @@ class StackedAutoEncoder:
             model = Sequential()
             # Add layers
             ilayer = 1
-            while(ilayer <= layer):
+            for ilayer in range(1,layer+1):
                  # Get the weights of ilayer
-                neurons_str = self.getNeuronsString(hidden_neurons[:ilayer])
+                neurons_str = self.getNeuronsString(data,hidden_neurons[:ilayer])
                 previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
                                                                         self.analysis_str,
                                                                         self.prefix_str,
@@ -267,27 +394,22 @@ class StackedAutoEncoder:
 
                 # Check if the layer was trained
                 if not os.path.exists(file_name):
-                    def trainFold(ifold):
-                        return self.trainLayer(data=data,
+                    self.trainLayer(data=data,
                                                 trgt=data,
                                                 ifold=ifold,
                                                 layer=ilayer,
                                                 hidden_neurons = hidden_neurons[:ilayer])
 
-                    p = Pool(processes=num_processes)
-                    folds = range(len(CVO))
-                    results = p.map(trainFold, folds)
-                    p.close()
-                    p.join()
 
                 layer_model = load_model(file_name)
                 layer_weights = layer_model.layers[0].get_weights()
                 if ilayer == 1:
-                    model.add(Dense(hidden_neurons[ilayer-1], input_dim=norm_data.shape[1], weights=layer_weights,
+                    model.add(Dense(hidden_neurons[0], input_dim=norm_data.shape[1], weights=layer_weights,
                                     trainable=True))
                 else:
                     model.add(Dense(hidden_neurons[ilayer-1], weights=layer_weights, trainable=True))
-                model.add(Activation(trn_params.params['hidden_activation']))
+
+                model.add(Activation(self.trn_params.params['hidden_activation']))
 
             # Add Output Layer
             model.add(Dense(trgt_sparse.shape[1], init="uniform"))
@@ -335,6 +457,5 @@ class StackedAutoEncoder:
             file_name = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
             classifier.save(file_name)
             file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
-            print file_name
-            joblib.dump([trn_desc],file_nasme,compress=9)
+            joblib.dump([trn_desc],file_name,compress=9)
         return ifold, classifier, trn_desc

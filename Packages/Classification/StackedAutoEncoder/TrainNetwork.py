@@ -12,7 +12,7 @@ from sklearn.externals import joblib
 
 from Functions import TrainParameters as trnparams
 from Functions import TrainFunctions
-from Functions import StackedAutoEncoder
+from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 import multiprocessing
 
@@ -43,8 +43,8 @@ database = '4classes'
 n_pts_fft = 1024
 decimation_rate = 3
 spectrum_bins_left = 400
-development_flag = True
-development_events = 1600
+development_flag = False
+development_events = 400
 
 # Check if LofarData has created...
 if not os.path.exists('%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl'%
@@ -126,56 +126,60 @@ analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-os.remove(trn_params_folder)
+#os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
-    trn_params = trnparams.SAENoveltyDetectionTrnParams(n_inits=2,
-                                                       hidden_activation='tanh', # others tanh, relu, sigmoid, linear
-                                                       output_activation='linear',
-                                                       n_epochs=50,  #500
-                                                       patience=10,  #30
-                                                       batch_size=4, #256
-                                                       verbose=False)
+    trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
+                                                         hidden_activation='tanh', # others tanh, relu, sigmoid, linear
+                                                         output_activation='linear',
+                                                         n_epochs=50,  #500
+                                                         patience=10,  #30
+                                                         batch_size=4, #256
+                                                         verbose=False)
     trn_params.save(trn_params_folder)
 else:
-    trn_params = trnparams.SAENoveltyDetectionTrnParams()
+    trn_params = trnparams.NeuralClassificationTrnParams()
     trn_params.load(trn_params_folder)
 
 # Choose how many fold to be used in Cross Validation
 n_folds = 2
-CVO = trnparams.NoveltyDetectionFolds(folder=results_path,n_folds=n_folds,trgt=all_trgt,dev=development_flag)
+CVO = trnparams.ClassificationFolds(folder=results_path, n_folds=n_folds, trgt=all_trgt, dev=development_flag, verbose=False)
 #print trn_params.get_params_str()
 
-# Train Process
-SAE = StackedAutoEncoder(trn_params = trnparams,
-                         development_flag = development_flag,
-                         n_folds = n_folds,
-                         n_inits = n_inits,
-                         save_path = save_path,
-                         prefix_str='RawData')
 
-start_time = time.time()
+# Train Process
+SAE = StackedAutoEncoders(params = trn_params,
+                          development_flag = development_flag,
+                          n_folds = n_folds,
+                          save_path = results_path,
+                          CVO = CVO)
+
+# Choose layer to be trained
+layer = 9
+
+hidden_neurons = range(400,0,-50) + [2]
+print hidden_neurons
+# Functions defined to be used by multiprocessing.Pool()
 def trainNeuron(ineuron):
     for ifold in range(n_folds):
-        #print 'Neuron value: %i - fold %i'%(ineuron, ifold)
-        SAE.trainLayer(data=trn_data,
-                       trgt=trn_data,
+        SAE.trainLayer(data=all_data,
+                       trgt=all_trgt,
                        ifold=ifold,
-                       hidden_neurons=[ineuron],
-                       layer = 1)
+                       hidden_neurons=hidden_neurons + [ineuron],
+                       layer = layer)
 
 def trainFold(ifold):
-    #print 'Neuron value: %i - fold %i'%(ineuron, ifold)
-    SAE.trainLayer(data=trn_data,
-                   trgt=trn_data,
-                   ifold=ifold,
-                   hidden_neurons=[400],
-                   layer = 1)
+    return SAE.trainLayer(data=all_data,
+                          trgt=all_trgt,
+                          ifold=ifold,
+                          hidden_neurons=hidden_neurons,
+                          layer = layer)
+
+start_time = time.time()
 
 # Start Parallel processing
 p = multiprocessing.Pool(processes=num_processes)
 
-folds = range(1,n_folds+1)
-
+folds = range(len(CVO))
 # To train on multiple cores sweeping the number of folds
 results = p.map(trainFold, folds)
 
