@@ -336,4 +336,5 @@ class StackedAutoEncoder:
             classifier.save(file_name)
             file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
             print file_name
-            joblib.dump([trn_desc],file_name,compress=9)
+            joblib.dump([trn_desc],file_nasme,compress=9)
+        return ifold, classifier, trn_desc
