@@ -1,7 +1,7 @@
 """
-    Author: Vinicius dos Santos Mello 
+    Author: Vinicius dos Santos Mello
             viniciusdsmello@poli.ufrj.br
-    
+
     Description: This file contains functions used for Neural Network training.
 """
 
@@ -32,16 +32,16 @@ num_process = multiprocessing.cpu_count()
     Function used to do a Fine Tuning in Stacked Auto Encoder for Classification of the data
     hidden_neurons contains the number of neurons in the sequence: [FirstLayer, SecondLayer, ... ]
 '''
-def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0, 
+def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                    n_folds=2, hidden_neurons=[],
                                    trn_params=None, save_path='', dev=False):
     if len(hidden_neurons) == 0:
         hidden_neurons = [1]
-        
+
     for i in range(len(hidden_neurons)):
         if hidden_neurons[i] == 0:
             hidden_neurons[i] = 1
-    
+
     trgt_sparse = np_utils.to_categorical(trgt.astype(int))
     # load or create cross validation ids
     CVO = trnparams.ClassificationFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
@@ -50,10 +50,10 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
     n_inits = trn_params.params['n_inits']
 
     params_str = trn_params.get_params_str()
-    
+
     analysis_str = 'StackedAutoEncoder'
     prefix_str = 'RawData'
-    
+
     # Create a string like InputDimension x FirstLayerDimension x ... x OutputDimension
     neurons_str = str(data.shape[1])
     for ineuron in hidden_neurons:
@@ -64,7 +64,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                                      prefix_str, n_folds,
                                                                      params_str)
 
-    
+
     if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         if os.path.exists(file_name):
@@ -89,19 +89,19 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
         scaler = preprocessing.MinMaxScaler().fit(data[train_id,:])
 
     norm_data = scaler.transform(data)
-    
+
     best_init = 0
     best_loss = 999
 
-    classifier = [] 
+    classifier = []
     trn_desc = {}
 
     for i_init in range(n_inits):
-        print 'Fold %i of %i Folds -  Init %i of %i Inits'%(ifold+1, 
-                                                            n_folds, 
+        print 'Fold %i of %i Folds -  Init %i of %i Inits'%(ifold+1,
+                                                            n_folds,
                                                             i_init+1,
                                                             n_inits)
-        
+
         # Get the weights of first layer
         layer = 1
         neurons_str = str(data.shape[1])
@@ -113,7 +113,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                                 params_str,
                                                                 neurons_str)
 
-        if not dev:        
+        if not dev:
             file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
         else:
             file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
@@ -123,24 +123,24 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                 return StackedAutoEncoderTrainFunction(data=all_data,
                                         trgt=all_data,
                                         ifold=ifold,
-                                        n_folds=n_folds, 
+                                        n_folds=n_folds,
                                         n_neurons=ineuron,
-                                        trn_params=trn_params, 
+                                        trn_params=trn_params,
                                         save_path=results_path,
                                         layer=layer,
-                                        hidden_neurons = hidden_neurons[:layer],            
+                                        hidden_neurons = hidden_neurons[:layer],
                                         dev=dev)
 
             p = Pool(processes=num_processes)
             folds = range(len(CVO))
             results = p.map(trainFold, folds)
             p.close()
-            p.join() 
+            p.join()
 
         first_layer_model = load_model(file_name)
         first_layer = first_layer_model.layers[0]
         first_layer_weights = first_layer.get_weights()
-            
+
         model = Sequential()
         model.add(Dense(hidden_neurons[0], input_dim=norm_data.shape[1], weights=first_layer_weights, trainable=True))
         model.add(Activation(trn_params.params['hidden_activation']))
@@ -157,7 +157,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                                     params_str,
                                                                     neurons_str)
 
-            if not dev:        
+            if not dev:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
@@ -167,27 +167,27 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                     return StackedAutoEncoderTrainFunction(data=all_data,
                                             trgt=all_data,
                                             ifold=ifold,
-                                            n_folds=n_folds, 
+                                            n_folds=n_folds,
                                             n_neurons=ineuron,
-                                            trn_params=trn_params, 
+                                            trn_params=trn_params,
                                             save_path=results_path,
                                             layer=layer,
-                                            hidden_neurons = hidden_neurons[:layer],              
+                                            hidden_neurons = hidden_neurons[:layer],
                                             dev=dev)
 
                 p = Pool(processes=num_processes)
                 folds = range(len(CVO))
                 results = p.map(trainFold, folds)
                 p.close()
-                p.join() 
+                p.join()
 
             second_layer_model = load_model(file_name)
             second_layer = second_layer_model.layers[0]
             second_layer_weights = second_layer.get_weights()
-            
+
             model.add(Dense(hidden_neurons[1], weights=second_layer_weights, trainable=True))
             model.add(Activation(trn_params.params['hidden_activation']))
-        # Add third hidden layer    
+        # Add third hidden layer
         if(len(hidden_neurons) > 2):
              # Get the weights of third layer
             layer = 3
@@ -200,7 +200,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                                     params_str,
                                                                     neurons_str)
 
-            if not dev:        
+            if not dev:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
@@ -210,9 +210,9 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                     return StackedAutoEncoderTrainFunction(data=all_data,
                                             trgt=all_data,
                                             ifold=ifold,
-                                            n_folds=n_folds, 
+                                            n_folds=n_folds,
                                             n_neurons=ineuron,
-                                            trn_params=trn_params, 
+                                            trn_params=trn_params,
                                             save_path=results_path,
                                             layer=layer,
                                             hidden_neurons = hidden_neurons[:layer],              
@@ -222,15 +222,15 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                 folds = range(len(CVO))
                 results = p.map(trainFold, folds)
                 p.close()
-                p.join() 
-            
+                p.join()
+
             third_layer_model = load_model(file_name)
             third_layer = third_layer_model.layers[0]
             third_layer_weights = third_layer.get_weights()
-            
+
             model.add(Dense(hidden_neurons[2], weights=third_layer_weights, trainable=True))
             model.add(Activation(trn_params.params['hidden_activation']))
-        # Add fourth hidden layer    
+        # Add fourth hidden layer
         if(len(hidden_neurons) > 3):
              # Get the weights of fourth layer
             layer = 4
@@ -243,7 +243,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                                                     params_str,
                                                                     neurons_str)
 
-            if not dev:        
+            if not dev:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
@@ -253,49 +253,49 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                     return StackedAutoEncoderTrainFunction(data=all_data,
                                             trgt=all_data,
                                             ifold=ifold,
-                                            n_folds=n_folds, 
+                                            n_folds=n_folds,
                                             n_neurons=ineuron,
-                                            trn_params=trn_params, 
+                                            trn_params=trn_params,
                                             save_path=results_path,
                                             layer=layer,
-                                            hidden_neurons = hidden_neurons[:layer],              
+                                            hidden_neurons = hidden_neurons[:layer],
                                             dev=dev)
 
                 p = Pool(processes=num_processes)
                 folds = range(len(CVO))
                 results = p.map(trainFold, folds)
                 p.close()
-                p.join() 
-            
+                p.join()
+
             fourth_layer_model = load_model(file_name)
             fourth_layer = fourth_layer_model.layers[0]
             fourth_layer_weights = fourth_layer.get_weights()
-            
+
             model.add(Dense(hidden_neurons[3], weights=fourth_layer_weights, trainable=True))
             model.add(Activation(trn_params.params['hidden_activation']))
-            
+
         # Add Output Layer
-        model.add(Dense(trgt_sparse.shape[1], init="uniform")) 
+        model.add(Dense(trgt_sparse.shape[1], init="uniform"))
         model.add(Activation('softmax'))
-        
-        adam = Adam(lr=trn_params.params['learning_rate'], 
+
+        adam = Adam(lr=trn_params.params['learning_rate'],
                     beta_1=trn_params.params['beta_1'],
                     beta_2=trn_params.params['beta_2'],
                     epsilon=trn_params.params['epsilon'])
-        
-        model.compile(loss='mean_squared_error', 
+
+        model.compile(loss='mean_squared_error',
                       optimizer=adam,
                       metrics=['accuracy'])
         # Train model
-        earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+        earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                 patience=trn_params.params['patience'],
-                                                verbose=trn_params.params['train_verbose'], 
+                                                verbose=trn_params.params['train_verbose'],
                                                 mode='auto')
 
-        init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id], 
-                                  nb_epoch=trn_params.params['n_epochs'], 
+        init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
+                                  nb_epoch=trn_params.params['n_epochs'],
                                   batch_size=trn_params.params['batch_size'],
-                                  callbacks=[earlyStopping], 
+                                  callbacks=[earlyStopping],
                                   verbose=trn_params.params['verbose'],
                                   validation_data=(norm_data[test_id],
                                                    trgt_sparse[test_id]),
@@ -311,7 +311,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
             trn_desc['val_acc'] = init_trn_desc.history['val_acc']
 
     # save model
-    if not dev:        
+    if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
@@ -322,17 +322,17 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
         file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
         print file_name
         joblib.dump([trn_desc],file_name,compress=9)
-        
+
 '''
     Function used to perform the layerwise algorithm to train the SAE
 '''
-def StackedAutoEncoderTrainFunction(data=None, trgt=None, 
-                                    ifold=0, n_folds=2, n_neurons=10, 
+def StackedAutoEncoderTrainFunction(data=None, trgt=None,
+                                    ifold=0, n_folds=2, n_neurons=10,
                                     trn_params=None, save_path='', dev=False, layer = 1, hidden_neurons = [400]):
-    
+
     if n_neurons == 0:
         n_neurons = 1
-    
+
     # load or create cross validation ids
     CVO = trnparams.ClassificationFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
 
@@ -340,10 +340,10 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
     n_inits = trn_params.params['n_inits']
 
     params_str = trn_params.get_params_str()
-    
+
     analysis_str = 'StackedAutoEncoder'
     prefix_str = 'RawData'
-    
+
     if layer == 1:
         neurons_str = str(data.shape[1]) + 'x' + str(n_neurons)
         model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
@@ -372,7 +372,7 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
             if trn_params.params['verbose']:
                 print 'File %s exists'%(file_name)
             return 0
-            
+
     train_id, test_id = CVO[ifold]
 
     #normalize data based in train set
@@ -385,24 +385,24 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
 
     norm_data = scaler.transform(data)
     norm_trgt = norm_data
-    
+
     best_init = 0
     best_loss = 999
 
     classifier = []
     trn_desc = {}
-    
+
     for i_init in range(n_inits):
-        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons, 
-                                                                         ifold+1, 
-                                                                         n_folds, 
+        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons,
+                                                                         ifold+1,
+                                                                         n_folds,
                                                                          i_init+1,
                                                                          n_inits)
         if layer == 1:
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(data.shape[1], init="uniform")) 
+            model.add(Dense(data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
         if layer == 2:
             # Get the projection of the data from previous layer
@@ -418,11 +418,11 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
-                
+
             ################################
             # Check if previous model was trained
             ################################
-            
+
             first_layer_model = load_model(file_name)
 
             get_layer_output = K.function([first_layer_model.layers[0].input],
@@ -432,7 +432,7 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
             norm_data = proj_all_data
         # end if layer == 2
@@ -455,7 +455,7 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
 
             get_first_layer_output = K.function([first_layer_model.layers[0].input],
                                           [first_layer_model.layers[1].output])
-            
+
             # Projection of first layer
             first_proj_all_data = get_first_layer_output([norm_data])[0]
 
@@ -474,17 +474,17 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             second_layer_model = load_model(file_name)
-            
+
             get_second_layer_output = K.function([second_layer_model.layers[0].input],
                                           [second_layer_model.layers[1].output])
-            
+
             # Projection of second layer
             second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
-        
+
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=second_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(second_proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(second_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
             norm_data = second_proj_all_data
         # end if layer == 3
@@ -507,7 +507,7 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
 
             get_first_layer_output = K.function([first_layer_model.layers[0].input],
                                           [first_layer_model.layers[1].output])
-            
+
             # Projection of first layer
             first_proj_all_data = get_first_layer_output([norm_data])[0]
 
@@ -526,10 +526,10 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             second_layer_model = load_model(file_name)
-            
+
             get_second_layer_output = K.function([second_layer_model.layers[0].input],
                                           [second_layer_model.layers[1].output])
-            
+
             # Projection of second layer
             second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
 
@@ -548,41 +548,41 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             third_layer_model = load_model(file_name)
-            
+
             get_third_layer_output = K.function([third_layer_model.layers[0].input],
                                           [third_layer_model.layers[1].output])
-            
+
             # Projection of third layer
             third_proj_all_data = get_third_layer_output([second_proj_all_data])[0]
-        
+
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=third_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(third_proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(third_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
             norm_data = third_proj_all_data
         #end if layer == 4
 
-        # Optimizer 
-        adam = Adam(lr=trn_params.params['learning_rate'], 
+        # Optimizer
+        adam = Adam(lr=trn_params.params['learning_rate'],
                     beta_1=trn_params.params['beta_1'],
                     beta_2=trn_params.params['beta_2'],
                     epsilon=trn_params.params['epsilon'])
 
-        model.compile(loss='mean_squared_error', 
+        model.compile(loss='mean_squared_error',
                       optimizer=adam,
                       metrics=['accuracy'])
-        
+
         # Train model
-        earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+        earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                 patience=trn_params.params['patience'],
-                                                verbose=trn_params.params['train_verbose'], 
+                                                verbose=trn_params.params['train_verbose'],
                                                 mode='auto')
 
-        init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id], 
-                                  nb_epoch=trn_params.params['n_epochs'], 
+        init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id],
+                                  nb_epoch=trn_params.params['n_epochs'],
                                   batch_size=trn_params.params['batch_size'],
-                                  callbacks=[earlyStopping], 
+                                  callbacks=[earlyStopping],
                                   verbose=trn_params.params['verbose'],
                                   validation_data=(norm_data[test_id],
                                                    norm_data[test_id]),
@@ -598,7 +598,7 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
             trn_desc['val_acc'] = init_trn_desc.history['val_acc']
 
     # save model
-    if not dev:        
+    if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
@@ -611,20 +611,20 @@ def StackedAutoEncoderTrainFunction(data=None, trgt=None,
 
 '''
     Function used to perform the training of a Classifier with one hidden layer.
-    Topology(in terms of neurons): 
+    Topology(in terms of neurons):
         InputDim(400) x n_neurons x OutputDim(Num of Classes)
 '''
-def NeuralTrainFunction(data=None, trgt=None, 
-                        ifold=0, n_folds=2, n_neurons=10, 
+def NeuralTrainFunction(data=None, trgt=None,
+                        ifold=0, n_folds=2, n_neurons=10,
                         trn_params=None, save_path='', dev=False):
-    
-    
+
+
     if n_neurons == 0:
         n_neurons = 1
 
     # turn targets in sparse mode
     trgt_sparse = np_utils.to_categorical(trgt.astype(int))
-    
+
     # load or create cross validation ids
     CVO = trnparams.ClassificationFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
 
@@ -632,7 +632,7 @@ def NeuralTrainFunction(data=None, trgt=None,
     n_inits = trn_params.params['n_inits']
 
     params_str = trn_params.get_params_str()
-    
+
     analysis_str = 'NeuralNetwork'
     prefix_str = 'RawData'
 
@@ -640,7 +640,7 @@ def NeuralTrainFunction(data=None, trgt=None,
                                                    prefix_str,n_folds,
                                                    params_str,n_neurons)
 
-    
+
     if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         if os.path.exists(file_name):
@@ -673,35 +673,35 @@ def NeuralTrainFunction(data=None, trgt=None,
     trn_desc = {}
 
     for i_init in range(n_inits):
-        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons, 
-                                                                         ifold+1, 
-                                                                         n_folds, 
+        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons,
+                                                                         ifold+1,
+                                                                         n_folds,
                                                                          i_init+1,
                                                                          n_inits)
         model = Sequential()
         model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
         model.add(Activation(trn_params.params['hidden_activation']))
-        model.add(Dense(trgt_sparse.shape[1], init="uniform")) 
+        model.add(Dense(trgt_sparse.shape[1], init="uniform"))
         model.add(Activation(trn_params.params['output_activation']))
-        
-        adam = Adam(lr=trn_params.params['learning_rate'], 
+
+        adam = Adam(lr=trn_params.params['learning_rate'],
                     beta_1=trn_params.params['beta_1'],
                     beta_2=trn_params.params['beta_2'],
                     epsilon=trn_params.params['epsilon'])
-        
-        model.compile(loss='mean_squared_error', 
+
+        model.compile(loss='mean_squared_error',
                       optimizer=adam,
                       metrics=['accuracy'])
         # Train model
-        earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+        earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                 patience=trn_params.params['patience'],
-                                                verbose=trn_params.params['train_verbose'], 
+                                                verbose=trn_params.params['train_verbose'],
                                                 mode='auto')
 
-        init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id], 
-                                  nb_epoch=trn_params.params['n_epochs'], 
+        init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
+                                  nb_epoch=trn_params.params['n_epochs'],
                                   batch_size=trn_params.params['batch_size'],
-                                  callbacks=[earlyStopping], 
+                                  callbacks=[earlyStopping],
                                   verbose=trn_params.params['verbose'],
                                   validation_data=(norm_data[test_id],
                                                    trgt_sparse[test_id]),
@@ -717,7 +717,7 @@ def NeuralTrainFunction(data=None, trgt=None,
             trn_desc['val_acc'] = init_trn_desc.history['val_acc']
 
     # save model
-    if not dev:        
+    if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
@@ -730,18 +730,18 @@ def NeuralTrainFunction(data=None, trgt=None,
 
 '''
     Function used to perform the training of a Classifier and Novelty Detector
-'''       
-def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0, 
-                           ifold=0, n_folds=2, n_neurons=1, 
+'''
+def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
+                           ifold=0, n_folds=2, n_neurons=1,
                            trn_params=None, save_path='',
                            verbose=False, dev=False):
-    
+
     # turn targets in sparse mode
     trgt_sparse = np_utils.to_categorical(trgt.astype(int))
-    
+
     # load or create cross validation ids
     CVO = trnparams.NoveltyDetectionFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
-    
+
     if n_neurons == 0:
         n_neurons = 1
 
@@ -749,9 +749,9 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
     n_inits = trn_params.params['n_inits']
     model_prefix_str = 'RawData_%i_novelty'%(inovelty)
     analysis_path = 'NeuralNetwork'
-    
+
     params_str = trn_params.get_params_str()
-    
+
     model_str = '%s/%s/%s_%i_folds_%s_%i_neurons'%(save_path,analysis_path,
                                                    model_prefix_str,
                                                    n_folds,
@@ -761,19 +761,19 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
         file_name = '%s_%i_fold_model.h5'%(model_str,ifold)
     else:
         file_name = '%s_%i_fold_model_dev.h5'%(model_str,ifold)
-        
+
     if trn_params.params['verbose']:
         print file_name
-    
+
     # Check if the model has already been trained
     if not os.path.exists(file_name):
         if verbose:
             print 'Train Model'
         # training
-        
+
         classifier = []
         trn_desc = {}
-        
+
         train_id, test_id = CVO[inovelty][ifold]
 
         # normalize data based in train set
@@ -785,41 +785,41 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
             scaler = preprocessing.MinMaxScaler().fit(data[train_id,:])
 
         norm_data = scaler.transform(data)
-        
+
         best_init = 0
         best_loss = 999
-        
+
         for i_init in range(n_inits):
-            print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons, 
-                                                                             ifold+1, 
-                                                                             n_folds, 
+            print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons,
+                                                                             ifold+1,
+                                                                             n_folds,
                                                                              i_init+1,
                                                                              n_inits)
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(trgt_sparse.shape[1], init="uniform")) 
+            model.add(Dense(trgt_sparse.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
-            
-            adam = Adam(lr=trn_params.params['learning_rate'], 
+
+            adam = Adam(lr=trn_params.params['learning_rate'],
                     beta_1=trn_params.params['beta_1'],
                     beta_2=trn_params.params['beta_2'],
                     epsilon=trn_params.params['epsilon'])
-            
-            model.compile(loss='mean_squared_error', 
+
+            model.compile(loss='mean_squared_error',
                           optimizer=adam,
                           metrics=['accuracy'])
-            
+
             # Train model
-            earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+            earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=trn_params.params['patience'],
-                                                    verbose=trn_params.params['train_verbose'], 
+                                                    verbose=trn_params.params['train_verbose'],
                                                     mode='auto')
 
-            init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id], 
-                                      nb_epoch=trn_params.params['n_epochs'], 
+            init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
+                                      nb_epoch=trn_params.params['n_epochs'],
                                       batch_size=trn_params.params['batch_size'],
-                                      callbacks=[earlyStopping], 
+                                      callbacks=[earlyStopping],
                                       verbose=trn_params.params['verbose'],
                                       validation_data=(norm_data[test_id],
                                                        trgt_sparse[test_id]),
@@ -833,9 +833,9 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
                 trn_desc['loss'] = init_trn_desc.history['loss']
                 trn_desc['val_loss'] = init_trn_desc.history['val_loss']
                 trn_desc['val_acc'] = init_trn_desc.history['val_acc']
-                
+
         # save model
-        if not dev:        
+        if not dev:
             file_name = '%s_%i_fold_model.h5'%(model_str,ifold)
             classifier.save(file_name)
             file_name = '%s_%i_fold_trn_desc.jbl'%(model_str,ifold)
@@ -847,7 +847,7 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
             joblib.dump([trn_desc],file_name,compress=9)
     else:
         # The model has already been trained, so load the files
-        if verbose: 
+        if verbose:
             print 'Load Model'
         classifier = Sequential()
         if not dev:
@@ -855,38 +855,38 @@ def NNNoveltyTrainFunction(data=None, trgt=None, inovelty=0,
         else:
             file_name = '%s_%i_fold_model_dev.h5'%(model_str,ifold)
         classifier = load_model(file_name)
-        
+
         if not dev:
             file_name = '%s_%i_fold_trn_desc.jbl'%(model_str,ifold)
         else:
             file_name = '%s_%i_fold_trn_desc_dev.jbl'%(model_str,ifold)
         [trn_desc] = joblib.load(file_name)
-        
-    return [classifier,trn_desc]       
+
+    return [classifier,trn_desc]
 
 
 def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2, n_neurons=1, layer = 1, hidden_neurons = [400],
                             trn_params=None, save_path='', verbose=False, dev=False):
-    
+
     for i in range(len(hidden_neurons)):
         if hidden_neurons[i] == 0:
             hidden_neurons = 1
-    
+
     if n_neurons == 0:
         n_neurons = 1
 
     # turn targets in sparse mode
     trgt_sparse = np_utils.to_categorical(trgt.astype(int))
-    
+
     # load or create cross validation ids
     CVO = trnparams.NoveltyDetectionFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
-    
+
     n_folds = len(CVO[0])
     n_inits = trn_params.params['n_inits']
     prefix_str = 'RawData_%i_novelty'%(inovelty)
     analysis_str = 'StackedAutoEncoder'
     params_str = trn_params.get_params_str()
-    
+
     if layer == 1:
         neurons_str = str(data.shape[1]) + 'x' + str(n_neurons)
         model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(save_path,analysis_str,
@@ -913,7 +913,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             if trn_params.params['verbose']:
                 print 'File %s exists'%(file_name)
             return 0
-            
+
     train_id, test_id = CVO[inovelty][ifold]
 
     #normalize data based in train set
@@ -926,17 +926,17 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
 
     norm_data = scaler.transform(data)
     norm_trgt = norm_data
-    
+
     best_init = 0
     best_loss = 999
 
     classifier = []
     trn_desc = {}
-    
+
     for i_init in range(n_inits):
-        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons, 
-                                                                         ifold+1, 
-                                                                         n_folds, 
+        print 'Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(n_neurons,
+                                                                         ifold+1,
+                                                                         n_folds,
                                                                          i_init+1,
                                                                          n_inits)
 
@@ -944,10 +944,10 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(data.shape[1], init="uniform")) 
+            model.add(Dense(data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
         # end if layer == 1
-        
+
         if layer == 2:
             # Load second layer model
             neurons_str = str(data.shape[1])
@@ -973,12 +973,12 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
-            
+
             norm_data = proj_all_data
         # end if layer == 2
-     
+
         if layer == 3:
             # Load first layer model
             neurons_str = str(data.shape[1])
@@ -998,7 +998,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
 
             get_first_layer_output = K.function([first_layer_model.layers[0].input],
                                           [first_layer_model.layers[1].output])
-            
+
             # Projection of first layer
             first_proj_all_data = get_first_layer_output([norm_data])[0]
             # Load second layer model
@@ -1016,19 +1016,19 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             second_layer_model = load_model(file_name)
-            
+
             get_second_layer_output = K.function([second_layer_model.layers[0].input],
                                           [second_layer_model.layers[1].output])
-            
+
             # Projection of second layer
             second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
-        
+
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=second_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(second_proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(second_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
-            
+
             norm_data = second_proj_all_data
         # end if layer == 3
         if layer == 4:
@@ -1050,7 +1050,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
 
             get_first_layer_output = K.function([first_layer_model.layers[0].input],
                                           [first_layer_model.layers[1].output])
-            
+
             # Projection of first layer
             first_proj_all_data = get_first_layer_output([norm_data])[0]
 
@@ -1069,10 +1069,10 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             second_layer_model = load_model(file_name)
-            
+
             get_second_layer_output = K.function([second_layer_model.layers[0].input],
                                           [second_layer_model.layers[1].output])
-            
+
             # Projection of second layer
             second_proj_all_data = get_second_layer_output([first_proj_all_data])[0]
 
@@ -1091,41 +1091,41 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
 
             third_layer_model = load_model(file_name)
-            
+
             get_third_layer_output = K.function([third_layer_model.layers[0].input],
                                           [third_layer_model.layers[1].output])
-            
+
             # Projection of third layer
             third_proj_all_data = get_third_layer_output([second_proj_all_data])[0]
-        
+
             model = Sequential()
             model.add(Dense(n_neurons, input_dim=third_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['hidden_activation']))
-            model.add(Dense(third_proj_all_data.shape[1], init="uniform")) 
+            model.add(Dense(third_proj_all_data.shape[1], init="uniform"))
             model.add(Activation(trn_params.params['output_activation']))
-            
+
             norm_data = third_proj_all_data
         #end if layer == 4
-            
+
         # Optmizer
-        adam = Adam(lr=trn_params.params['learning_rate'], 
+        adam = Adam(lr=trn_params.params['learning_rate'],
                     beta_1=trn_params.params['beta_1'],
                     beta_2=trn_params.params['beta_2'],
                     epsilon=trn_params.params['epsilon'])
-        
-        model.compile(loss='mean_squared_error', 
+
+        model.compile(loss='mean_squared_error',
                       optimizer=adam,
                       metrics=['accuracy'])
         # Train model
-        earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+        earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                 patience=trn_params.params['patience'],
-                                                verbose=trn_params.params['train_verbose'], 
+                                                verbose=trn_params.params['train_verbose'],
                                                 mode='auto')
 
-        init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id], 
-                                  nb_epoch=trn_params.params['n_epochs'], 
+        init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id],
+                                  nb_epoch=trn_params.params['n_epochs'],
                                   batch_size=trn_params.params['batch_size'],
-                                  callbacks=[earlyStopping], 
+                                  callbacks=[earlyStopping],
                                   verbose=trn_params.params['verbose'],
                                   validation_data=(norm_data[test_id],
                                                    norm_data[test_id]),
@@ -1141,7 +1141,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
             trn_desc['val_acc'] = init_trn_desc.history['val_acc']
 
     # save model
-    if not dev:        
+    if not dev:
         file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc.jbl'%(model_str,ifold)
@@ -1151,7 +1151,7 @@ def SAENoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2
         classifier.save(file_name)
         file_name = '%s_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
         joblib.dump([trn_desc],file_name,compress=9)
-    
+
     return [classifier, trn_desc]
 
 def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0, n_folds=2, hidden_neurons = [400],
@@ -1159,16 +1159,16 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
 
     # turn targets in sparse mode
     trgt_sparse = np_utils.to_categorical(trgt.astype(int))
-    
+
     # load or create cross validation ids
     CVO = trnparams.NoveltyDetectionFolds(folder=save_path,n_folds=n_folds,trgt=trgt,dev=dev)
-    
+
     n_folds = len(CVO[inovelty])
     n_inits = trn_params.params['n_inits']
     prefix_str = 'RawData_%i_novelty'%(inovelty)
     analysis_str = 'StackedAutoEncoder'
     params_str = trn_params.get_params_str()
-    
+
     neurons_str = str(data.shape[1])
     for ineuron in hidden_neurons:
         neurons_str = neurons_str + 'x' + str(ineuron)
@@ -1181,7 +1181,7 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
         file_name = '%s_classifier_fold_%i_model.h5'%(model_str,ifold)
     else:
         file_name = '%s_classifier_fold_%i_model_dev.h5'%(model_str,ifold)
-    
+
     if not os.path.exists(file_name):
         train_id, test_id = CVO[inovelty][ifold]
 
@@ -1203,10 +1203,10 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
         trn_desc = {}
 
         for i_init in range(n_inits):
-            print 'Topology: %sx%i - Fold %i of %i Folds -  Init %i of %i Inits'%(neurons_str, 
-                                                                                  trgt_sparse.shape[1], 
-                                                                                  ifold+1, 
-                                                                                  n_folds, 
+            print 'Topology: %sx%i - Fold %i of %i Folds -  Init %i of %i Inits'%(neurons_str,
+                                                                                  trgt_sparse.shape[1],
+                                                                                  ifold+1,
+                                                                                  n_folds,
                                                                                   i_init+1,
                                                                                   n_inits)
 
@@ -1227,7 +1227,7 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
             first_layer_model = load_model(file_name)
             encoder_first_layer = first_layer_model.layers[0].get_weights()
 
-            model = Sequential()    
+            model = Sequential()
 
             # Encoder of first layer
             model.add(Dense(hidden_neurons[0], input_dim=norm_data.shape[1], weights=encoder_first_layer, trainable=False))
@@ -1301,28 +1301,28 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
                 model.add(Dense(hidden_neurons[3], weights=encoder_fourth_layer, trainable=False))
                 model.add(Activation(trn_params.params['hidden_activation']))
 
-            model.add(Dense(trgt_sparse.shape[1], init="uniform")) 
+            model.add(Dense(trgt_sparse.shape[1], init="uniform"))
             model.add(Activation('softmax'))
 
             # Optmizer
-            adam = Adam(lr=trn_params.params['learning_rate'], 
+            adam = Adam(lr=trn_params.params['learning_rate'],
                         beta_1=trn_params.params['beta_1'],
                         beta_2=trn_params.params['beta_2'],
                         epsilon=trn_params.params['epsilon'])
 
-            model.compile(loss='mean_squared_error', 
+            model.compile(loss='mean_squared_error',
                           optimizer=adam,
                           metrics=['accuracy'])
             # Train model
-            earlyStopping = callbacks.EarlyStopping(monitor='val_loss', 
+            earlyStopping = callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=trn_params.params['patience'],
-                                                    verbose=trn_params.params['train_verbose'], 
+                                                    verbose=trn_params.params['train_verbose'],
                                                     mode='auto')
 
-            init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id], 
-                                      nb_epoch=trn_params.params['n_epochs'], 
+            init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
+                                      nb_epoch=trn_params.params['n_epochs'],
                                       batch_size=trn_params.params['batch_size'],
-                                      callbacks=[earlyStopping], 
+                                      callbacks=[earlyStopping],
                                       verbose=trn_params.params['verbose'],
                                       validation_data=(norm_data[test_id],
                                                        trgt_sparse[test_id]),
@@ -1339,7 +1339,7 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
                 trn_desc['val_acc'] = init_trn_desc.history['val_acc']
 
         # save model
-        if not dev:        
+        if not dev:
             file_name = '%s_classifier_fold_%i_model.h5'%(model_str,ifold)
             classifier.save(file_name)
             file_name = '%s_classifier_fold_%i_trn_desc.jbl'%(model_str,ifold)
@@ -1351,7 +1351,7 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
             joblib.dump([trn_desc],file_name,compress=9)
     else:
         # The model has already been trained, so load the files
-        if verbose: 
+        if verbose:
             print 'Load Model'
         classifier = Sequential()
         if not dev:
@@ -1359,11 +1359,11 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
         else:
             file_name = '%s_classifier_fold_%i_model_dev.h5'%(model_str,ifold)
         classifier = load_model(file_name)
-        
+
         if not dev:
             file_name = '%s_classifier_fold_%i_trn_desc.jbl'%(model_str,ifold)
         else:
             file_name = '%s_classifier_fold_%i_trn_desc_dev.jbl'%(model_str,ifold)
         [trn_desc] = joblib.load(file_name)
-        
-    return [classifier,trn_desc]     
+
+    return [classifier,trn_desc]

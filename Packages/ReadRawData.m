@@ -34,7 +34,7 @@ if(exist(sprintf('%s/%s',outputpath,database),'dir'))
     rmdir(sprintf('%s/%s',outputpath,database), 's')
 end
 
-mkdir(sprintf('%s/%s',outputpath,database));
+%mkdir(sprintf('%s/%s',outputpath,database));
 
 data_info.class_labels = {};
 data_info.fs = {};
