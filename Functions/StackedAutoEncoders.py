@@ -369,10 +369,11 @@ class StackedAutoEncoders:
         trn_desc = {}
 
         for i_init in range(self.n_inits):
-            print 'Fold %i of %i Folds -  Init %i of %i Inits'%(ifold+1,
-                                                                self.n_folds,
-                                                                i_init+1,
-                                                                self.n_inits)
+            print 'Layer: %i - Fold: %i of %i Folds -  Init: %i of %i Inits'%(layer,
+                                                                           ifold+1,
+                                                                           self.n_folds,
+                                                                           i_init+1,
+                                                                           self.n_inits)
             # Start the model
             model = Sequential()
             # Add layers
