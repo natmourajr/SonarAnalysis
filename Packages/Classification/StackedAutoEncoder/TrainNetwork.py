@@ -89,11 +89,12 @@ else:
 
     for iclass, class_label in enumerate(class_labels):
         if development_flag:
-            class_events = all_data[all_trgt==iclass,:]
             if len(balanced_data) == 0:
+                class_events = all_data[all_trgt==iclass,:]
                 balanced_data = class_events[0:development_events,:]
                 balanced_trgt = (iclass)*np.ones(development_events)
             else:
+                class_events = all_data[all_trgt==iclass,:]
                 balanced_data = np.append(balanced_data,
                                           class_events[0:development_events,:],
                                           axis=0)
@@ -120,13 +121,12 @@ else:
     from keras.utils import np_utils
     trgt_sparse = np_utils.to_categorical(all_trgt.astype(int))
 
-
 # Load train parameters
 analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-#os.remove(trn_params_folder)
+os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
     trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
@@ -142,9 +142,8 @@ else:
 
 # Choose how many fold to be used in Cross Validation
 n_folds = 2
-CVO = trnparams.ClassificationFolds(folder=results_path, n_folds=n_folds, trgt=all_trgt, dev=development_flag, verbose=False)
-#print trn_params.get_params_str()
-
+CVO = trnparams.ClassificationFolds(folder=results_path, n_folds=2, trgt=all_trgt, dev=development_flag, verbose=True)
+print trn_params.get_params_str()
 
 # Train Process
 SAE = StackedAutoEncoders(params = trn_params,
@@ -154,9 +153,11 @@ SAE = StackedAutoEncoders(params = trn_params,
                           CVO = CVO)
 
 # Choose layer to be trained
-layer = 9
+layer = 1
 
 hidden_neurons = range(400,0,-50) + [2]
+regularizer = "dropout"
+regularizer_param = 0.5
 print hidden_neurons
 # Functions defined to be used by multiprocessing.Pool()
 def trainNeuron(ineuron):
@@ -165,26 +166,34 @@ def trainNeuron(ineuron):
                        trgt=all_trgt,
                        ifold=ifold,
                        hidden_neurons=hidden_neurons + [ineuron],
-                       layer = layer)
+                       layer = layer,
+                       regularizer="l1",
+                       regularizer_param=0.01)
 
 def trainFold(ifold):
     return SAE.trainLayer(data=all_data,
                           trgt=all_trgt,
                           ifold=ifold,
                           hidden_neurons=hidden_neurons,
-                          layer = layer)
+                          layer = layer,
+                          regularizer="dropout",
+                          regularizer_param=0.5)
 
 start_time = time.time()
 
 # Start Parallel processing
 p = multiprocessing.Pool(processes=num_processes)
 
+####################### SAE LAYERS ############################
+# It is necessary to choose the layer to be trained
+
+# To train on multiple cores sweeping the number of neurons
 folds = range(len(CVO))
-# To train on multiple cores sweeping the number of folds
 results = p.map(trainFold, folds)
 
-#results = p.map(trainNeuron, neurons_mat)
-
+# To train multiple topologies sweeping the number of neurons
+# neurons_mat = range(0,400,50) (start,final,step)
+# results = p.map(trainNeuron, neurons_mat)
 p.close()
 p.join()
 

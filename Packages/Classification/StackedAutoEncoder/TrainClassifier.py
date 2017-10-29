@@ -43,7 +43,7 @@ database = '4classes'
 n_pts_fft = 1024
 decimation_rate = 3
 spectrum_bins_left = 400
-development_flag = False
+development_flag = True
 development_events = 400
 
 # Check if LofarData has created...
@@ -126,7 +126,7 @@ analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-#os.remove(trn_params_folder)
+os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
     trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
@@ -140,11 +140,10 @@ else:
     trn_params = trnparams.NeuralClassificationTrnParams()
     trn_params.load(trn_params_folder)
 
-# Choose how many fold to be used in Cross Validation
+# Choose how many folds to be used in Cross Validation
 n_folds = 2
 CVO = trnparams.ClassificationFolds(folder=results_path, n_folds=n_folds, trgt=all_trgt, dev=development_flag, verbose=False)
 #print trn_params.get_params_str()
-
 
 # Train Process
 SAE = StackedAutoEncoders(params = trn_params,
@@ -195,6 +194,7 @@ start_time = time.time()
 
 # Start Parallel processing
 p = multiprocessing.Pool(processes=num_processes)
+
 ####################### SAE LAYERS ############################
 # It is necessary to choose the layer to be trained
 

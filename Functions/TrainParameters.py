@@ -6,6 +6,7 @@ import os
 import numpy as np
 from sklearn.externals import joblib
 from sklearn import model_selection
+from sklearn.model_selection import StratifiedKFold
 
 class TrnParams(object):
     """
@@ -24,7 +25,7 @@ class TrnParams(object):
 
 # classification
 
-def ClassificationFolds(folder,n_folds=2,trgt=None, dev=False, verbose=False):
+def ClassificationFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False):
 
     if n_folds < 2:
         print 'Invalid number of folds'
@@ -74,7 +75,10 @@ class NeuralClassificationTrnParams(TrnParams):
                  patience=5,
                  batch_size=4,
                  hidden_activation='tanh',
-                 output_activation='tanh'
+                 output_activation='tanh',
+                 metrics=['accuracy'],
+                 loss='mean_squared_error',
+                 optmizerAlgorithm='SGD'
                 ):
         self.params = {}
 
@@ -96,11 +100,16 @@ class NeuralClassificationTrnParams(TrnParams):
         self.params['batch_size'] = batch_size
         self.params['hidden_activation'] = hidden_activation
         self.params['output_activation'] = output_activation
+        self.params['metrics'] = metrics
+        self.params['loss'] = loss
+        self.params['optmizerAlgorithm'] = optmizerAlgorithm
 
     def get_params_str(self):
-        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation'%
+        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation_%s_metric_%s_loss'%
                      (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
-                      self.params['hidden_activation'],self.params['output_activation']))
+                      self.params['hidden_activation'],self.params['output_activation'],
+                      self.params['metrics'][0],
+                      self.params['loss']))
         return param_str
 
 # novelty detection
@@ -125,8 +134,9 @@ def NoveltyDetectionFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False
 
         CVO = {}
         for inovelty,novelty_class in enumerate(np.unique(trgt)):
+            skf = model_selection.StratifiedKFold(n_splits=n_folds)
             process_trgt = trgt[trgt!=novelty_class]
-            CVO[inovelty] = model_selection.StratifiedKFold(process_trgt, n_folds)
+            CVO[inovelty] = skf.split(X = np.zeros(process_trgt.shape), y=process_trgt)
             CVO[inovelty] = list(CVO[inovelty])
         if verbose:
             print 'Saving in %s'%(file_name)

@@ -13,7 +13,7 @@ from sklearn.externals import joblib
 from Functions import TrainParameters as trnparams
 from Functions import TrainFunctions
 
-import multiprocessing 
+import multiprocessing
 
 init_time = time.time()
 
@@ -65,7 +65,7 @@ else:
     # turn targets in sparse mode
     from keras.utils import np_utils
     trgt_sparse = np_utils.to_categorical(all_trgt.astype(int))
-    
+
     # Process data
     # unbalanced data to balanced data with random data creation of small classes
 
@@ -94,7 +94,7 @@ else:
                 balanced_trgt = (iclass)*np.ones(development_events)
             else:
                 balanced_data = np.append(balanced_data,
-                                          class_events[0:development_events,:], 
+                                          class_events[0:development_events,:],
                                           axis=0)
                 balanced_trgt = np.append(balanced_trgt,(iclass)*np.ones(development_events))
         else:
@@ -111,14 +111,14 @@ else:
                 balanced_data = np.append(balanced_data,created_events,axis=0)
                 balanced_trgt = np.append(balanced_trgt,
                                           (iclass)*np.ones(created_events.shape[0]),axis=0)
-        
+
     all_data = balanced_data
     all_trgt = balanced_trgt
 
     # turn targets in sparse mode
     from keras.utils import np_utils
     trgt_sparse = np_utils.to_categorical(all_trgt.astype(int))
-    
+
 # Load train parameters
 
 analysis_str = 'StackedAutoEncoder'
@@ -128,7 +128,7 @@ trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_n
 #os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
     trn_params = trnparams.SAENoveltyDetectionTrnParams(n_inits=1,
-                                                       hidden_activation='tanh', # others tanh, relu, sigmoid, linear 
+                                                       hidden_activation='tanh', # others tanh, relu, sigmoid, linear
                                                        output_activation='linear',
                                                        n_epochs=500,
                                                        patience=30,
@@ -138,7 +138,7 @@ if not os.path.exists(trn_params_folder):
 else:
     trn_params = trnparams.SAENoveltyDetectionTrnParams()
     trn_params.load(trn_params_folder)
-    
+
 # Choose how many fold to be used in Cross Validation
 n_folds = 10
 CVO = trnparams.NoveltyDetectionFolds(folder=results_path,n_folds=n_folds,trgt=all_trgt,dev=development_flag)
@@ -167,14 +167,14 @@ for inovelty in novelty_train:
     trn_trgt = all_trgt[all_trgt!=inovelty]
 
     trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
-    
+
     if inovelty != 0:
         print ''
     print 'Novelty class: %i'%inovelty
-    
+
     # Array with folds to be trained in parallel
     folds = range(len(CVO[inovelty]))
-    
+
     n_folds = len(CVO[inovelty])
     def trainFold(ifold):
         TrainFunctions.SAEClassifierNoveltyTrainFunction(data=trn_data,
@@ -187,16 +187,16 @@ for inovelty in novelty_train:
                                                    save_path=results_path,
                                                    verbose=verbose,
                                                    dev=development_flag)
-    
-    
+
+
     # Start Parallel processing
     p = multiprocessing.Pool(processes=num_processes)
-    
+
     # To train on multiple cores sweeping the number of neurons
     results = p.map(trainFold, folds)
-            
+
     p.close()
-    p.join()        
+    p.join()
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)

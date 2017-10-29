@@ -215,7 +215,7 @@ def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                             trn_params=trn_params,
                                             save_path=results_path,
                                             layer=layer,
-                                            hidden_neurons = hidden_neurons[:layer],              
+                                            hidden_neurons = hidden_neurons[:layer],
                                             dev=dev)
 
                 p = Pool(processes=num_processes)
