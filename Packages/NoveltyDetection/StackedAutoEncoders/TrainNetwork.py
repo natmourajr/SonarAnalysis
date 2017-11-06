@@ -5,13 +5,12 @@ import numpy as np
 import time
 
 from keras.utils import np_utils
-from keras.models import load_model
+from keras import backend as K
 
 import sklearn.metrics
 from sklearn.externals import joblib
 
 from Functions import TrainParameters as trnparams
-from Functions import TrainFunctions
 from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 import multiprocessing
@@ -126,16 +125,17 @@ analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-#os.remove(trn_params_folder)
+if os.path.exists(trn_params_folder):
+    os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
     trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
                                                          output_activation='linear',
-                                                         n_epochs=100,  #500
-                                                         patience=10,  #30
-                                                         batch_size=128, #256
+                                                         n_epochs=500,  #500
+                                                         patience=30,  #30
+                                                         batch_size=128, #128
                                                          verbose=True,
-                                                         loss='kullback-leibler-divergence')
+                                                         optmizerAlgorithm='Adam')
     trn_params.save(trn_params_folder)
 else:
     trn_params = trnparams.NeuralClassificationTrnParams()
@@ -177,7 +177,7 @@ n_folds = len(CVO[inovelty])
 hidden_neurons = range(400,0,-50) + [2]
 print hidden_neurons
 
-regularizer = ""
+regularizer = "" #dropout / l1 / l2
 regularizer_param = 0.5
 
 trn_data = all_data[all_trgt!=inovelty]
@@ -206,25 +206,26 @@ def trainFold(ifold):
 
 start_time = time.time()
 
-# Start Parallel processing
-p = multiprocessing.Pool(processes=num_processes)
+if K.backend() == 'theano':
+    # Start Parallel processing
+    p = multiprocessing.Pool(processes=num_processes)
 
-####################### SAE LAYERS ############################
-# It is necessary to choose the layer to be trained
+    ####################### SAE LAYERS ############################
+    # It is necessary to choose the layer to be trained
 
-# To train on multiple cores sweeping the number of neurons
-folds = range(len(CVO))
-results = p.map(trainFold, folds)
+    # To train on multiple cores sweeping the number of folds
+    folds = range(len(CVO[inovelty]))
+    results = p.map(trainFold, folds)
 
+    # To train multiple topologies sweeping the number of neurons
+    # neurons_mat = range(0,400,50) (start,final,step)
+    # results = p.map(trainNeuron, neurons_mat)
 
-# To train multiple topologies sweeping the number of neurons
-# neurons_mat = range(0,400,50) (start,final,step)
-# results = p.map(trainNeuron, neurons_mat)
-
-p.close()
-p.join()
-
-result = trainFold(0)
+    p.close()
+    p.join()
+else:
+    for ifold in range(len(CVO[inovelty])):
+        result = trainFold(ifold)
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)

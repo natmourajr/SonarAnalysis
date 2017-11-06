@@ -22,6 +22,10 @@ class TrnParams(object):
     def load(self, name="None"):
         [self.params] = joblib.load(name)
 
+    def printParams(self):
+        for iparameter in self.params:
+            print iparameter + ': ' + str(self.params[iparameter])
+
 
 # classification
 
