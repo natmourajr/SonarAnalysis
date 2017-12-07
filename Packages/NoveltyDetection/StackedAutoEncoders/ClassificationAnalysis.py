@@ -4,6 +4,46 @@ import pickle
 import numpy as np
 import time
 
+import argparse
+
+# Argument Parser config
+
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+
+parser.add_argument("-l", "--layer", default=1, type=int, help="Select layer to be analyzed")
+parser.add_argument("--type", type=str, default="representation",
+                    help="Select type of analysis to be made <representation|classification>")
+parser.add_argument("--analysis", type=str, default="mse/neurons_sweep",
+                    help="Select analysis to be made. \n\
+                    Representation:\n\
+                     - mse/neurons_sweep \n\
+                     - kl/neurons_sweep \n\
+                    Classification: \n\
+                     - sp \n\
+                     - kl \n\
+                     - sp/kl"
+                     )
+
+args = parser.parse_args()
+
+analysis_type = ["representation",
+                 "classification"]
+analysis = {}
+analysis["representation"] = ["mse/neurons_sweep",
+                              "kl/neurons_sweep",
+                             ]
+
+
+analysis["classification"] = ["sp",
+                              "sp/kl",
+                             ]
+try:
+    analysis[args.type].index(args.analysis)
+except:
+    parser.print_help()
+    exit()
+
+
 from keras.utils import np_utils
 from keras import backend as K
 
@@ -159,10 +199,6 @@ if len(sys.argv) < 2:
 inovelty = int(sys.argv[1])
 print '\nNovelty class to train: %i'%inovelty
 
-# Choose neurons topology
-
-# Create neurons vector to be used in multiprocessing.Pool()
-
 SAE = StackedAutoEncoders(params           = trn_params,
                           development_flag = development_flag,
                           n_folds          = n_folds,
@@ -186,25 +222,47 @@ trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
 
 # Choose layer to be trained
 layer = 2
-# Functions defined to be used by multiprocessing.Pool()
-def trainNeuron(ineuron):
-    for ifold in range(n_folds):
-        SAE.trainLayer(data = trn_data,
-                       trgt = trn_trgt,
-                       ifold = ifold,
-                       hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                       layer = layer,
-                       regularizer = regularizer,
-                       regularizer_param = regularizer_param)
 
-def trainFold(ifold):
-    return SAE.trainLayer(data = trn_data,
-                          trgt = trn_trgt,
-                          ifold = ifold,
-                          hidden_neurons = hidden_neurons,
-                          layer = layer,
-                          regularizer = regularizer,
-                          regularizer_param = regularizer_param)
+# Functions defined to be used by multiprocessing.Pool()
+
+# SP Index
+
+for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
+        if ineuron == 0:
+            ineuron = 1
+        neurons_str = SAE[inovelty].getNeuronsString(all_data, hidden_neurons=hidden_neurons[:layer-1]+[ineuron])
+
+        if verbose:
+            print '[*] Layer: %i - Topology: %s'%(layer, neurons_str)
+
+        def getSP(ifold):
+            train_id, test_id = CVO[inovelty][ifold]
+
+            # normalize known classes
+            if trn_params.params['norm'] == 'mapstd':
+                scaler = preprocessing.StandardScaler().fit(trn_data[inovelty][train_id,:])
+            elif trn_params.params['norm'] == 'mapstd_rob':
+                scaler = preprocessing.RobustScaler().fit(trn_data[inovelty][train_id,:])
+            elif trn_params.params['norm'] == 'mapminmax':
+                scaler = preprocessing.MinMaxScaler().fit(trn_data[inovelty][train_id,:])
+
+            known_data = scaler.transform(trn_data[inovelty][test_id,:])
+
+            classifier = SAE[inovelty].loadClassifier(data  = trn_data[inovelty],
+                                                      trgt  = trn_trgt[inovelty],
+                                                      hidden_neurons = hidden_neurons[:layer-1]+[ineuron],
+                                                      layer = layer,
+                                                      ifold = ifold)
+
+            known_output = classifier.predict(known_data)
+
+            num_known_classes = trn_trgt_sparse[inovelty].shape[1]
+
+            efficiency = metrics.recall_score(trn_trgt_sparse[inovelty][test_id,:], np.round(known_output), average=None)
+            sp_index = np.sum(efficiency)/num_known_classes * np.power(np.prod(efficiency), 1/num_known_classes)
+            sp_index = np.sqrt(sp_index)
+
+            return ifold, sp_index
 
 start_time = time.time()
 
@@ -217,11 +275,11 @@ if K.backend() == 'theano':
 
     # To train on multiple cores sweeping the number of folds
     # folds = range(len(CVO[inovelty]))
-    # results = p.map(trainFold, folds)
+    # results = p.map(trainClassifierFold, folds)
 
     # To train multiple topologies sweeping the number of neurons
-    neurons_mat = [10, 20] + range(50,450,50)
-    # results = p.map(trainNeuron, neurons_mat)
+    # neurons_mat = range(0,400,50)
+    # results = p.map(trainClassifierFold, neurons_mat)
 
     p.close()
     p.join()
@@ -231,7 +289,7 @@ else:
     #     result = trainFold(ifold)
     for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
         print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
-        result = trainNeuron(ineuron)
+        result = trainClassifierNeuron(ineuron)
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)

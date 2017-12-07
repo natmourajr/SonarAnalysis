@@ -5,13 +5,13 @@ import numpy as np
 import time
 
 from keras.utils import np_utils
-from keras.models import load_model
+from keras import backend as K
 
 import sklearn.metrics
 from sklearn.externals import joblib
 
 from Functions import TrainParameters as trnparams
-from Functions import TrainFunctions
+from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 import multiprocessing
 
@@ -88,11 +88,12 @@ else:
 
     for iclass, class_label in enumerate(class_labels):
         if development_flag:
-            class_events = all_data[all_trgt==iclass,:]
             if len(balanced_data) == 0:
+                class_events = all_data[all_trgt==iclass,:]
                 balanced_data = class_events[0:development_events,:]
                 balanced_trgt = (iclass)*np.ones(development_events)
             else:
+                class_events = all_data[all_trgt==iclass,:]
                 balanced_data = np.append(balanced_data,
                                           class_events[0:development_events,:],
                                           axis=0)
@@ -120,83 +121,125 @@ else:
     trgt_sparse = np_utils.to_categorical(all_trgt.astype(int))
 
 # Load train parameters
-
 analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-#os.remove(trn_params_folder)
+# if os.path.exists(trn_params_folder):
+#     os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
-    trn_params = trnparams.SAENoveltyDetectionTrnParams(n_inits=1,
-                                                       hidden_activation='tanh', # others tanh, relu, sigmoid, linear
-                                                       output_activation='linear',
-                                                       n_epochs=500,
-                                                       patience=30,
-                                                       batch_size=128,
-                                                       verbose=False)
+    trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
+                                                         hidden_activation='tanh', # others tanh, relu, sigmoid, linear
+                                                         output_activation='linear',
+                                                         n_epochs=500,  #500
+                                                         patience=30,  #30
+                                                         batch_size=128, #128
+                                                         verbose=False,
+                                                         optmizerAlgorithm='Adam',
+                                                         metrics=['accuracy'],
+                                                         loss='mean_squared_error')
     trn_params.save(trn_params_folder)
 else:
-    trn_params = trnparams.SAENoveltyDetectionTrnParams()
+    trn_params = trnparams.NeuralClassificationTrnParams()
     trn_params.load(trn_params_folder)
 
 # Choose how many fold to be used in Cross Validation
 n_folds = 10
-CVO = trnparams.NoveltyDetectionFolds(folder=results_path,n_folds=n_folds,trgt=all_trgt,dev=development_flag)
+CVO = trnparams.NoveltyDetectionFolds(folder=results_path, n_folds=n_folds, trgt=all_trgt, dev=development_flag, verbose=True)
 print trn_params.get_params_str()
 
-##### Train Process #####
+if development_flag:
+    print '[+] Development mode'
 
-novelty_train = [int(sys.argv[1])]
-print 'Novelty to Train: %s'%sys.argv[1]
+# Train Process
+if len(sys.argv) < 2:
+    print '[-] Usage: %s <novelty class>'%sys.argv[0]
+    exit()
 
-verbose = False
+inovelty = int(sys.argv[1])
+print '\nNovelty class to train: %i'%inovelty
 
-# Choose topology of the network
-hidden_neurons = [400,300, 200]
+# Choose neurons topology
 
-neurons_str = str(all_data.shape[1])
-for ineuron in hidden_neurons:
-	neurons_str = neurons_str + 'x' + str(ineuron)
-print 'Topology: %s'%neurons_str
+# Create neurons vector to be used in multiprocessing.Pool()
 
-print trn_params.get_params_str()
+SAE = StackedAutoEncoders(params           = trn_params,
+                          development_flag = development_flag,
+                          n_folds          = n_folds,
+                          save_path        = results_path,
+                          CVO              = CVO,
+                          noveltyDetection = True,
+                          inovelty         = inovelty)
+
+
+n_folds = len(CVO[inovelty])
+
+#hidden_neurons = range(400,0,-50) + [2]
+hidden_neurons = [100,50,20,10,2]
+print hidden_neurons
+
+regularizer = "" #dropout / l1 / l2
+regularizer_param = 0.5
+
+trn_data = all_data[all_trgt!=inovelty]
+trn_trgt = all_trgt[all_trgt!=inovelty]
+trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
+
+# Choose layer to be trained
+layer = 5
+
+# Functions defined to be used by multiprocessing.Pool()
+def trainClassifierFold(ifold):
+    return SAE.trainClassifier(data  = trn_data,
+                               trgt  = trn_trgt,
+                               ifold = ifold,
+                               hidden_neurons=hidden_neurons,
+                               layer = layer)
+
+def trainClassifierNeuron(ineuron):
+    for ifold in range(n_folds):
+        SAE.trainClassifier(data  = trn_data,
+                            trgt  = trn_trgt,
+                            ifold = ifold,
+                            hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
+                            layer = layer)
+
+# Train classifier sweeping the number of layer
+def trainClassifierLayer(ilayer):
+    for ifold in range(n_folds):
+        SAE.trainClassifier(data  = trn_data,
+                            trgt  = trn_trgt,
+                            ifold = ifold,
+                            hidden_neurons = hidden_neurons,
+                            layer = ilayer)
+
 
 start_time = time.time()
-for inovelty in novelty_train:
-    trn_data = all_data[all_trgt!=inovelty]
-    trn_trgt = all_trgt[all_trgt!=inovelty]
 
-    trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
-
-    if inovelty != 0:
-        print ''
-    print 'Novelty class: %i'%inovelty
-
-    # Array with folds to be trained in parallel
-    folds = range(len(CVO[inovelty]))
-
-    n_folds = len(CVO[inovelty])
-    def trainFold(ifold):
-        TrainFunctions.SAEClassifierNoveltyTrainFunction(data=trn_data,
-                                                   trgt=trn_trgt,
-                                                   inovelty=inovelty,
-                                                   ifold=ifold,
-                                                   n_folds=n_folds,
-                                                   hidden_neurons=hidden_neurons,
-                                                   trn_params=trn_params,
-                                                   save_path=results_path,
-                                                   verbose=verbose,
-                                                   dev=development_flag)
-
-
+if K.backend() == 'theano':
     # Start Parallel processing
     p = multiprocessing.Pool(processes=num_processes)
 
-    # To train on multiple cores sweeping the number of neurons
-    results = p.map(trainFold, folds)
+    ####################### SAE LAYERS ############################
+    # It is necessary to choose the layer to be trained
+
+    # To train on multiple cores sweeping the number of folds
+    # folds = range(len(CVO[inovelty]))
+    # results = p.map(trainClassifierFold, folds)
+
+    # To train multiple topologies sweeping the number of neurons
+    # neurons_mat = range(0,400,50)
+    # results = p.map(trainClassifierFold, neurons_mat)
 
     p.close()
     p.join()
+else:
+    #neurons_mat = [10, 20] + range(50,450,50)
+    for ifold in range(len(CVO[inovelty])):
+        result = trainClassifierFold(ifold)
+    #for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
+    #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
+    #    result = trainClassifierNeuron(ineuron)
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)
