@@ -109,11 +109,13 @@ class NeuralClassificationTrnParams(TrnParams):
         self.params['optmizerAlgorithm'] = optmizerAlgorithm
 
     def get_params_str(self):
-        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation_%s_metric_%s_loss'%
+        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation'%
                      (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
-                      self.params['hidden_activation'],self.params['output_activation'],
-                      self.params['metrics'][0],
-                      self.params['loss']))
+                      self.params['hidden_activation'],self.params['output_activation']))
+        for imetric in self.params['metrics']:
+            param_str = param_str + '_' + imetric
+      
+        param_str = param_str + '_metric_' + self.params['loss'] + '_loss'
         return param_str
 
 # novelty detection

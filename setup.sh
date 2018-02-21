@@ -37,14 +37,15 @@ export MY_PATH=$SONAR_WORKSPACE
 
 # Folder Configuration
 if [ -d "$OUTPUTDATAPATH" ]; then
-    read -e -p "Folder $OUTPUTDATAPATH exist, Do you want to erase it? [Y,n] " yn_erase
-    if [ "$yn_erase" = "Y" ]; then
-        echo "creating OUTPUTDATAPATH struct"
-        rm -rf $OUTPUTDATAPATH
-        mkdir $OUTPUTDATAPATH
-        cd $SONAR_WORKSPACE/Packages
-        for i in $(ls -d */); do mkdir $OUTPUTDATAPATH/${i%%/}; done
-    fi
+    cd $SONAR_WORKSPACE
+    #read -e -p "Folder $OUTPUTDATAPATH exist, Do you want to erase it? [Y,n] " yn_erase
+    #if [ "$yn_erase" = "Y" ]; then
+    #    echo "creating OUTPUTDATAPATH struct"
+    #    rm -rf $OUTPUTDATAPATH
+    #    mkdir $OUTPUTDATAPATH
+    #    cd $SONAR_WORKSPACE/Packages
+    #    for i in $(ls -d */); do mkdir $OUTPUTDATAPATH/${i%%/}; done
+    #fi
 else
     echo "OUTPUTDATAPATH: $OUTPUTDATAPATH doesnt exists"
     echo "creating OUTPUTDATAPATH struct"

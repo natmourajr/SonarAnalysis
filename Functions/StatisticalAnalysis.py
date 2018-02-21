@@ -37,7 +37,7 @@ def EstPDF(data, bins=np.array([-1,0, 1]), mode='kernel', kernel='epanechnikov',
         return [pdf,bins_centers]
 
 # Computing KL Divergence
-def KLDiv(p, q, bins=np.array([-1,0, 1]), mode='kernel', kernel='epanechnikov', kernel_bw=0.1, verbose=False):
+def KLDiv(p, q, bins=np.array([-1,0,1]), mode='kernel', kernel='epanechnikov', kernel_bw=0.1, verbose=False):
     [p_pdf,p_bins] = EstPDF(p, bins=bins, mode=mode, kernel=kernel, kernel_bw=kernel_bw, verbose=verbose)
     [q_pdf,q_bins] = EstPDF(q, bins=bins, mode=mode, kernel=kernel, kernel_bw=kernel_bw, verbose=verbose)
     kl_values = []

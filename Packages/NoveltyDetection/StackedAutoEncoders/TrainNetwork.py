@@ -169,12 +169,13 @@ SAE = StackedAutoEncoders(params           = trn_params,
                           save_path        = results_path,
                           CVO              = CVO,
                           noveltyDetection = True,
-                          inovelty         = inovelty)
-
+                          inovelty         = inovelty,
+                          allow_change_weights = False)
 
 n_folds = len(CVO[inovelty])
 
 hidden_neurons = range(400,0,-50) + [2]
+# hidden_neurons = [20]
 print hidden_neurons
 
 regularizer = "" #dropout / l1 / l2
@@ -226,7 +227,8 @@ if K.backend() == 'theano':
     p.close()
     p.join()
 else:
-    neurons_mat = [10, 20] + range(50,450,50)
+    neurons_mat = range(5,20,5)
+    #neurons_mat = [10, 20] + range(50,450,50)
     # for ifold in range(len(CVO[inovelty])):
     #     result = trainFold(ifold)
     for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:

@@ -125,15 +125,15 @@ analysis_str = 'StackedAutoEncoder'
 model_prefix_str = 'RawData'
 
 trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_name)
-# if os.path.exists(trn_params_folder):
-#     os.remove(trn_params_folder)
+if os.path.exists(trn_params_folder):
+    os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
     trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
                                                          output_activation='linear',
-                                                         n_epochs=500,  #500
+                                                         n_epochs=300,  #500
                                                          patience=30,  #30
-                                                         batch_size=128, #128
+                                                         batch_size=256, #128
                                                          verbose=False,
                                                          optmizerAlgorithm='Adam',
                                                          metrics=['accuracy'],
@@ -169,13 +169,15 @@ SAE = StackedAutoEncoders(params           = trn_params,
                           save_path        = results_path,
                           CVO              = CVO,
                           noveltyDetection = True,
-                          inovelty         = inovelty)
+                          inovelty         = inovelty,
+                          allow_change_weights = False)
 
 
 n_folds = len(CVO[inovelty])
 
-#hidden_neurons = range(400,0,-50) + [2]
-hidden_neurons = [100,50,20,10,2]
+hidden_neurons = range(400,0,-50) + [2]
+#hidden_neurons = [100,50,20,10,2]
+#hidden_neurons = [20,15,10,5]
 print hidden_neurons
 
 regularizer = "" #dropout / l1 / l2
@@ -186,15 +188,16 @@ trn_trgt = all_trgt[all_trgt!=inovelty]
 trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
 
 # Choose layer to be trained
-layer = 5
+layer = 2
 
 # Functions defined to be used by multiprocessing.Pool()
 def trainClassifierFold(ifold):
-    return SAE.trainClassifier(data  = trn_data,
-                               trgt  = trn_trgt,
-                               ifold = ifold,
-                               hidden_neurons=hidden_neurons,
-                               layer = layer)
+    SAE.trainClassifier(data  = trn_data,
+                        trgt  = trn_trgt,
+                        ifold = ifold,
+                        hidden_neurons=hidden_neurons,
+                        layer = layer)
+    return ifold
 
 def trainClassifierNeuron(ineuron):
     for ifold in range(n_folds):
@@ -218,8 +221,8 @@ start_time = time.time()
 
 if K.backend() == 'theano':
     # Start Parallel processing
-    p = multiprocessing.Pool(processes=num_processes)
 
+    p = multiprocessing.Pool(processes=num_processes)
     ####################### SAE LAYERS ############################
     # It is necessary to choose the layer to be trained
 
@@ -234,12 +237,20 @@ if K.backend() == 'theano':
     p.close()
     p.join()
 else:
+    #neurons_mat = range(5,20,5)
     #neurons_mat = [10, 20] + range(50,450,50)
-    for ifold in range(len(CVO[inovelty])):
-        result = trainClassifierFold(ifold)
+    #for ifold in range(len(CVO[inovelty])):
+    #    result = trainClassifierFold(ifold)
     #for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
     #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
     #    result = trainClassifierNeuron(ineuron)
+
+    p = multiprocessing.Pool(processes=num_processes)
+    # To train on multiple cores sweeping the number of folds
+    folds = range(len(CVO[inovelty]))
+    results = p.map(trainClassifierFold, folds)
+    p.close()
+    p.join()
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)

@@ -30,12 +30,13 @@ num_process = multiprocessing.cpu_count()
 
 class StackedAutoEncoders:
     def __init__(self, params = None, development_flag = False, n_folds = 2, save_path='', prefix_str='RawData', CVO=None,
-                 noveltyDetection=False, inovelty = 0):
+                 noveltyDetection=False, inovelty = 0, allow_change_weights=False):
         self.trn_params       = params
         self.development_flag = development_flag
         self.n_folds          = n_folds
         self.save_path        = save_path
         self.noveltyDetection = noveltyDetection
+        self.allow_change_weights = allow_change_weights
 
         self.n_inits          = self.trn_params.params['n_inits']
         self.params_str       = self.trn_params.get_params_str()
@@ -172,7 +173,7 @@ class StackedAutoEncoders:
                 if ilayer == 1:
                     model.add(Dense(hidden_neurons[ilayer-1], input_dim=data.shape[1], weights=layer_encoder_weights[ilayer], trainable=False))
                     model.add(Activation(self.trn_params.params['hidden_activation']))
-                else: 
+                else:
                     model.add(Dense(hidden_neurons[ilayer-1], weights=layer_encoder_weights[ilayer], trainable=False))
                     model.add(Activation(self.trn_params.params['hidden_activation']))
             # Decoder
@@ -248,7 +249,7 @@ class StackedAutoEncoders:
                 model.add(Dense(units=hidden_neurons[ilayer-1], weights=layer_weights, trainable=True))
 
             model.add(Activation(self.trn_params.params['hidden_activation']))
-                
+
         return model
 
     '''
@@ -311,12 +312,12 @@ class StackedAutoEncoders:
         trn_desc = {}
 
         for i_init in range(self.n_inits):
-            print 'Layer: %i - Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(layer,
-                                                                                         hidden_neurons[layer-1],
-                                                                                         ifold+1,
-                                                                                         self.n_folds,
-                                                                                         i_init+1,
-                                                                                         self.n_inits)
+            print 'Autoencoder - Layer: %i - Neuron: %i - Fold %i of %i Folds -  Init %i of %i Inits'%(layer,
+                                                                                                        hidden_neurons[layer-1],
+                                                                                                        ifold+1,
+                                                                                                        self.n_folds,
+                                                                                                        i_init+1,
+                                                                                                        self.n_inits)
             model = Sequential()
             proj_all_data = norm_data
             if layer == 1:
@@ -466,7 +467,6 @@ class StackedAutoEncoders:
                 classifier = load_model(file_name, custom_objects={'%s'%self.trn_params.params['loss']: self.lossFunction})
             except:
                 print '[-] Error: File or Directory not found'
-                return
         return classifier
 
     '''
@@ -536,7 +536,7 @@ class StackedAutoEncoders:
         trn_desc = {}
 
         for i_init in range(self.n_inits):
-            print 'Layer: %i - Fold: %i of %i Folds -  Init: %i of %i Inits'%(layer,
+            print 'Classifier - Layer: %i - Fold: %i of %i Folds -  Init: %i of %i Inits'%(layer,
                                                                             ifold+1,
                                                                             self.n_folds,
                                                                             i_init+1,
@@ -573,9 +573,9 @@ class StackedAutoEncoders:
                 layer_weights = layer_model.layers[0].get_weights()
                 if ilayer == 1:
                     model.add(Dense(units=hidden_neurons[0], input_dim=norm_data.shape[1], weights=layer_weights,
-                                    trainable=True))
+                                    trainable=self.allow_change_weights))
                 else:
-                    model.add(Dense(units=hidden_neurons[ilayer-1], weights=layer_weights, trainable=True))
+                    model.add(Dense(units=hidden_neurons[ilayer-1], weights=layer_weights, trainable=self.allow_change_weights))
 
                 model.add(Activation(self.trn_params.params['hidden_activation']))
 
@@ -597,8 +597,7 @@ class StackedAutoEncoders:
                                       batch_size=self.trn_params.params['batch_size'],
                                       callbacks=[earlyStopping],
                                       verbose=self.trn_params.params['verbose'],
-                                      validation_data=(norm_data[test_id],
-                                                       trgt_sparse[test_id]),
+                                      validation_data=(norm_data[test_id], trgt_sparse[test_id]),
                                       shuffle=True)
             if np.min(init_trn_desc.history['val_loss']) < best_loss:
                 best_init = i_init
