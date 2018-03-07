@@ -128,7 +128,7 @@ trn_params_folder='%s/%s/%s_trnparams.jbl'%(results_path,analysis_str,analysis_n
 if os.path.exists(trn_params_folder):
     os.remove(trn_params_folder)
 if not os.path.exists(trn_params_folder):
-    trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
+    trn_params = trnparams.NeuralClassificationTrnParams(n_inits=2,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
                                                          output_activation='linear',
                                                          n_epochs=300,  #500
@@ -156,7 +156,7 @@ if len(sys.argv) < 2:
     print '[-] Usage: %s <novelty class>'%sys.argv[0]
     exit()
 
-inovelty = int(sys.argv[1])
+inovelty = int(sys.argv[2])
 print '\nNovelty class to train: %i'%inovelty
 
 # Choose neurons topology
@@ -180,7 +180,7 @@ hidden_neurons = range(400,0,-50) + [2]
 #hidden_neurons = [20,15,10,5]
 print hidden_neurons
 
-regularizer = "" #dropout / l1 / l2
+regularizer = "l2" #dropout / l1 / l2
 regularizer_param = 0.5
 
 trn_data = all_data[all_trgt!=inovelty]
@@ -188,7 +188,7 @@ trn_trgt = all_trgt[all_trgt!=inovelty]
 trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
 
 # Choose layer to be trained
-layer = 2
+layer = int(sys.argv[1])
 
 # Functions defined to be used by multiprocessing.Pool()
 def trainClassifierFold(ifold):
@@ -196,7 +196,9 @@ def trainClassifierFold(ifold):
                         trgt  = trn_trgt,
                         ifold = ifold,
                         hidden_neurons=hidden_neurons,
-                        layer = layer)
+                        layer = layer,
+			regularizer=regularizer,
+			regularizer_param=regularizer_param)
     return ifold
 
 def trainClassifierNeuron(ineuron):
@@ -205,7 +207,9 @@ def trainClassifierNeuron(ineuron):
                             trgt  = trn_trgt,
                             ifold = ifold,
                             hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                            layer = layer)
+                            layer = layer,
+			    regularizer=regularizer,
+			    regularizer_param=regularizer_param)
 
 # Train classifier sweeping the number of layer
 def trainClassifierLayer(ilayer):
@@ -214,7 +218,9 @@ def trainClassifierLayer(ilayer):
                             trgt  = trn_trgt,
                             ifold = ifold,
                             hidden_neurons = hidden_neurons,
-                            layer = ilayer)
+                            layer = ilayer, 
+			    regularizer=regularizer,
+			    regularizer_param=regularizer_param)
 
 
 start_time = time.time()

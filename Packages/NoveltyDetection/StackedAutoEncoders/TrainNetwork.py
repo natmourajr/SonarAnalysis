@@ -131,9 +131,9 @@ if not os.path.exists(trn_params_folder):
     trn_params = trnparams.NeuralClassificationTrnParams(n_inits=1,
                                                          hidden_activation='tanh', # others tanh, relu, sigmoid, linear
                                                          output_activation='linear',
-                                                         n_epochs=500,  #500
+                                                         n_epochs=300,  #500
                                                          patience=30,  #30
-                                                         batch_size=128, #128
+                                                         batch_size=256, #128
                                                          verbose=False,
                                                          optmizerAlgorithm='Adam',
                                                          metrics=['accuracy'],
@@ -156,7 +156,7 @@ if len(sys.argv) < 2:
     print '[-] Usage: %s <novelty class>'%sys.argv[0]
     exit()
 
-inovelty = int(sys.argv[1])
+inovelty = int(sys.argv[2])
 print '\nNovelty class to train: %i'%inovelty
 
 # Choose neurons topology
@@ -175,10 +175,10 @@ SAE = StackedAutoEncoders(params           = trn_params,
 n_folds = len(CVO[inovelty])
 
 hidden_neurons = range(400,0,-50) + [2]
-# hidden_neurons = [20]
+#hidden_neurons = [250]
 print hidden_neurons
 
-regularizer = "" #dropout / l1 / l2
+regularizer = "l2" #dropout / l1 / l2
 regularizer_param = 0.5
 
 trn_data = all_data[all_trgt!=inovelty]
@@ -186,10 +186,12 @@ trn_trgt = all_trgt[all_trgt!=inovelty]
 trn_trgt[trn_trgt>inovelty] = trn_trgt[trn_trgt>inovelty]-1
 
 # Choose layer to be trained
-layer = 2
+layer = int(sys.argv[1])
+print "Layer %i"%layer
+
 # Functions defined to be used by multiprocessing.Pool()
 def trainNeuron(ineuron):
-    for ifold in range(n_folds):
+    def train(ifold):
         SAE.trainLayer(data = trn_data,
                        trgt = trn_trgt,
                        ifold = ifold,
@@ -197,6 +199,15 @@ def trainNeuron(ineuron):
                        layer = layer,
                        regularizer = regularizer,
                        regularizer_param = regularizer_param)
+    
+    p = multiprocessing.Pool(processes=num_processes)
+    
+    folds = range(len(CVO[inovelty]))
+    results = p.map(train, folds)
+
+    p.close()
+    p.join()
+
 
 def trainFold(ifold):
     return SAE.trainLayer(data = trn_data,
@@ -227,13 +238,14 @@ if K.backend() == 'theano':
     p.close()
     p.join()
 else:
-    neurons_mat = range(5,20,5)
-    #neurons_mat = [10, 20] + range(50,450,50)
-    # for ifold in range(len(CVO[inovelty])):
-    #     result = trainFold(ifold)
-    for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
-        print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
-        result = trainNeuron(ineuron)
+    #neurons_mat = range(5,20,5)
+    #neurons_mat = [10] + range(25,275,25)
+    #neurons_mat = [10,20]
+    for ifold in range(len(CVO[inovelty])):
+         result = trainFold(ifold)
+    #for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
+    #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
+    #    result = trainNeuron(ineuron)
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)
