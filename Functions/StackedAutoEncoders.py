@@ -546,13 +546,16 @@ class StackedAutoEncoders:
             # Add layers
             for ilayer in range(1,layer+1):
                  # Get the weights of ilayer
-                neurons_str = self.getNeuronsString(data,hidden_neurons[:ilayer])
-                previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
-                                                                        self.analysis_str,
-                                                                        self.prefix_str,
-                                                                        self.n_folds,
-                                                                        self.params_str,
-                                                                        neurons_str)
+                neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
+                if regularizer != None and len(regularizer) != 0:
+                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%f)'%(self.save_path, self.analysis_str,
+                                                                                               self.prefix_str, self.n_folds,
+                                                                                               self.params_str, neurons_str,
+                                                                                               regularizer, regularizer_param)
+                else:
+                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
+                                                                            self.prefix_str, self.n_folds,
+                                                                            self.params_str, neurons_str)
 
                 if not self.development_flag:
                     file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
