@@ -251,12 +251,12 @@ else:
     #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
     #    result = trainClassifierNeuron(ineuron)
 
-    p = multiprocessing.Pool(processes=num_processes)
+    #p = multiprocessing.Pool(processes=num_processes)
     # To train on multiple cores sweeping the number of folds
-    folds = range(len(CVO[inovelty]))
-    results = p.map(trainClassifierFold, folds)
-    p.close()
-    p.join()
-
+    #folds = range(len(CVO[inovelty]))
+    #results = p.map(trainClassifierFold, folds)
+    #p.close()
+    #p.join()
+    trainClassifierFold(0)
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)
