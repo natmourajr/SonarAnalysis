@@ -175,10 +175,9 @@ SAE = StackedAutoEncoders(params           = trn_params,
 n_folds = len(CVO[inovelty])
 
 hidden_neurons = range(400,0,-50) + [2]
-#hidden_neurons = [250]
 print hidden_neurons
 
-regularizer = "l2" #dropout / l1 / l2
+regularizer = "" #dropout / l1 / l2
 regularizer_param = 0.5
 
 trn_data = all_data[all_trgt!=inovelty]
@@ -239,13 +238,13 @@ if K.backend() == 'theano':
     p.join()
 else:
     #neurons_mat = range(5,20,5)
-    #neurons_mat = [10] + range(25,275,25)
+    neurons_mat = [1] + range(25,425,25)
     #neurons_mat = [10,20]
-    for ifold in range(len(CVO[inovelty])):
-         result = trainFold(ifold)
-    #for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
-    #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
-    #    result = trainNeuron(ineuron)
+    #for ifold in range(len(CVO[inovelty])):
+    #     result = trainFold(ifold)
+    for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
+        print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
+        result = trainNeuron(ineuron)
 
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)

@@ -176,11 +176,9 @@ SAE = StackedAutoEncoders(params           = trn_params,
 n_folds = len(CVO[inovelty])
 
 hidden_neurons = range(400,0,-50) + [2]
-#hidden_neurons = [100,50,20,10,2]
-#hidden_neurons = [20,15,10,5]
 print hidden_neurons
 
-regularizer = "l2" #dropout / l1 / l2
+regularizer = "" #dropout / l1 / l2
 regularizer_param = 0.5
 
 trn_data = all_data[all_trgt!=inovelty]
@@ -197,30 +195,39 @@ def trainClassifierFold(ifold):
                         ifold = ifold,
                         hidden_neurons=hidden_neurons,
                         layer = layer,
-			regularizer=regularizer,
-			regularizer_param=regularizer_param)
+                        regularizer=regularizer,
+                        regularizer_param=regularizer_param)
     return ifold
 
 def trainClassifierNeuron(ineuron):
-    for ifold in range(n_folds):
-        SAE.trainClassifier(data  = trn_data,
-                            trgt  = trn_trgt,
-                            ifold = ifold,
-                            hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                            layer = layer,
-			    regularizer=regularizer,
-			    regularizer_param=regularizer_param)
+    try:
+        def train(ifold):
+            SAE.trainClassifier(data  = trn_data,
+                                trgt  = trn_trgt,
+                                ifold = ifold,
+                                hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
+                                layer = layer,
+                                regularizer=regularizer,
+                                regularizer_param=regularizer_param)
+        p = multiprocessing.Pool(processes=num_processes)
+
+        folds = range(len(CVO[inovelty]))
+        results = p.map(train, folds)
+
+        p.close()
+        p.join()
+    except Exception as e:
+        print e
 
 # Train classifier sweeping the number of layer
 def trainClassifierLayer(ilayer):
-    for ifold in range(n_folds):
         SAE.trainClassifier(data  = trn_data,
                             trgt  = trn_trgt,
                             ifold = ifold,
                             hidden_neurons = hidden_neurons,
                             layer = ilayer, 
-			    regularizer=regularizer,
-			    regularizer_param=regularizer_param)
+                            regularizer=regularizer,
+                            regularizer_param=regularizer_param)
 
 
 start_time = time.time()
@@ -243,20 +250,16 @@ if K.backend() == 'theano':
     p.close()
     p.join()
 else:
-    #neurons_mat = range(5,20,5)
-    #neurons_mat = [10, 20] + range(50,450,50)
-    #for ifold in range(len(CVO[inovelty])):
-    #    result = trainClassifierFold(ifold)
-    #for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
-    #    print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
-    #    result = trainClassifierNeuron(ineuron)
-
+    neurons_mat = [1] + range(25,425,25)
+    for ineuron in neurons_mat[:len(neurons_mat)-layer+2]:
+        print '[*] Training Layer %i - %i Neurons'%(layer, ineuron)
+        result = trainClassifierNeuron(ineuron)
+    
     #p = multiprocessing.Pool(processes=num_processes)
     # To train on multiple cores sweeping the number of folds
     #folds = range(len(CVO[inovelty]))
     #results = p.map(trainClassifierFold, folds)
     #p.close()
     #p.join()
-    trainClassifierFold(0)
 end_time = time.time() - start_time
 print "It took %.3f seconds to perform the training"%(end_time)
