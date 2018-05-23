@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-    This file contains the Novelty Detection Analysis with Stacked AutoEncoders Class
+    This file contains the Novelty Detection Analysis with Stacked AutoEncoders
     Author: Vinicius dos Santos Mello <viniciusdsmello@poli.ufrj.br>
 """
 import os
 import sys
+sys.path.insert(0,'..')
+
 import pickle
 import numpy as np
 import time
@@ -20,14 +22,13 @@ from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn import metrics
 
-#import matplotlib.pyplot as plt
-
 from Functions import TrainParameters
 from Functions import DataHandler as dh
-#from Functions import FunctionsDataVisualization
-from Functions.NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
+
 from Functions.StackedAutoEncoders import StackedAutoEncoders
 from Functions.StatisticalAnalysis import KLDiv, EstPDF
+
+from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
 
 num_processes = multiprocessing.cpu_count()
 
@@ -35,7 +36,9 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     
     def __init__(self, analysis_name='StackedAutoEncoder', database='4classes', n_pts_fft=1024, decimation_rate=3, spectrum_bins_left=400,
                  development_flag=False, development_events=400, model_prefix_str='RawData', n_folds=10, verbose=True): 
-        super(SAENoveltyDetectionAnalysis, self).__init__(analysis_name, database, n_pts_fft, decimation_rate, spectrum_bins_left, development_flag, development_events, model_prefix_str, verbose)
+        
+        super(SAENoveltyDetectionAnalysis, self).__init__(analysis_name, database, n_pts_fft, decimation_rate, spectrum_bins_left, development_flag,
+                                                          development_events, model_prefix_str, verbose)
 
         self.analysis_name = analysis_name
         self.trn_params = None
@@ -106,113 +109,22 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         Method that implements different types of training through interfacing SAE methods
     '''
     def train(self, inovelty=0, fineTuning=False, trainingType="normal", data=None, trgt=None, ifold=0, hidden_neurons=[1], neurons_mat=[], layer=1,
-              regularizer=None, regularizer_param=None):
-            if (trainingType == "normal"):
-                if (fineTuning):
-                    # Do fine tuning training step for specified layer
-                    return self.SAE[inovelty].trainClassifier(data=data, trgt=trgt, ifold=ifold, hidden_neurons=hidden_neurons, layer=layer, regularizer=regularizer, regularizer_param=regularizer_param)
-                else:
-                    # Train autoencoder for specified layer
-                    return self.SAE[inovelty].trainLayer(data=data, trgt=trgt, ifold=ifold, hidden_neurons=hidden_neurons, layer=layer, regularizer=regularizer, regularizer_param=regularizer_param)
-            elif (trainingType == "neuronSweep"):
-                if (not neurons_mat):
-                    print "[-] Neurons array should not be empty for this type of training"
-                    return None
-                if (fineTuning):
-                    def train(ineuron):
-                        self.SAE[inovelty].trainClassifier(data  = data,
-                                                           trgt  = trgt,
-                                                           ifold = ifold,
-                                                           hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                                                           layer = layer,
-                                                           regularizer=regularizer,
-                                                           regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
+              regularizer=None, regularizer_param=None, numThreads=num_processes):
+        if fineTuning == False:
+            fineTuning = 0
+        else: 
+            fineTuning = 1
+        
+        if regularizer != None and regularizer_param != None:
+            sysCall = "python modelTrain.py --layer {0} --novelty {1} --finetunning {2} --threads {3} --regularizer {4} --paramvalue {5} --type {6}".format(
+            layer, inovelty, fineTuning, numThreads, regularizer, regularizer_param, trainingType)
+        else:
+            sysCall = "python modelTrain.py --layer {0} --novelty {1} --finetunning {2} --threads {3} --type {4}".format(
+            layer, inovelty, fineTuning, numThreads, trainingType)
+        
+        os.system(sysCall)
+        
 
-                    results = p.map(train, neurons_mat)
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ineuron):
-                        self.SAE[inovelty].trainLayer(data  = data,
-                                                      trgt  = trgt,
-                                                      ifold = ifold,
-                                                      hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                                                      layer = layer,
-                                                      regularizer=regularizer,
-                                                      regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, neurons_mat)
-
-                    p.close()
-                    p.join()
-            elif (trainingType == "layerSweep"):
-                if (fineTuning):
-                    def train(ilayer):
-                        self.SAE[inovelty].trainClassifier(data  = data,
-                                                           trgt  = trgt,
-                                                           ifold = ifold,
-                                                           hidden_neurons = hidden_neurons[:ilayer-1],
-                                                           layer = ilayer,
-                                                           regularizer=regularizer,
-                                                           regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(1,layer+1))
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ilayer):
-                        self.SAE[inovelty].trainLayer(data  = data,
-                                                      trgt  = trgt,
-                                                      ifold = ifold,
-                                                      hidden_neurons = hidden_neurons[:ilayer-1],
-                                                      layer = ilayer,
-                                                      regularizer=regularizer,
-                                                      regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(1,layer+1))
-
-                    p.close()
-                    p.join()
-            elif (trainingType == "foldSweep"):
-                if (fineTuning):
-                    def train(fold):
-                        self.SAE[inovelty].trainClassifier(data  = data,
-                                                           trgt  = trgt,
-                                                           ifold = fold,
-                                                           hidden_neurons = hidden_neurons,
-                                                           layer = layer,
-                                                           regularizer=regularizer,
-                                                           regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(len(self.CVO)))
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ilayer):
-                        self.SAE[inovelty].trainLayer(data  = data,
-                                                        trgt  = trgt,
-                                                        ifold = fold,
-                                                        hidden_neurons = hidden_neurons,
-                                                        layer = layer,
-                                                        regularizer=regularizer,
-                                                        regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(len(self.CVO)))
-
-                    p.close()
-                    p.join()
-            else:
-                print "[-] %s is not set as a type of training"
-                return None
 '''    def klDivergenceNeuronsVariation(self, inovelty = 0, layer = 1, hidden_neurons = range(400,0,-50),
                                      neurons_mat = [], regularizer=None, regularizer_param=None,
                                      clearPrevious = False, language='en'):

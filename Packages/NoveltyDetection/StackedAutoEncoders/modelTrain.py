@@ -15,23 +15,12 @@ parser.add_argument("--type", type=str, default="representation",
 
 args = parser.parse_args()
 
-
 from SAENoveltyDetectionAnalysis import SAENoveltyDetectionAnalysis
+
 analysis = SAENoveltyDetectionAnalysis(analysis_name="StackedAutoEncoder", verbose=False)
 
-analysis.setTrainParameters(n_inits=2,
-                            hidden_activation='tanh',
-                            output_activation='linear',
-                            n_epochs=300,
-                            n_folds=10,
-                            patience=30,
-                            batch_size=256,
-                            verbose=False,
-                            optmizerAlgorithm='Adam',
-                            metrics=['accuracy'],
-                            loss='mean_squared_error')
-
 analysis.createSAEModels()
+
 SAE, trn_data, trn_trgt, trn_trgt_sparse = analysis.getSAEModels()
 
 import multiprocessing
@@ -51,7 +40,6 @@ hidden_neurons=range(400,0,-50)
 neurons_mat = [10, 20] + range(50,450,50)
 
 layer = args.layer
-
 regularizer=args.regularizer
 regularizer_param=args.paramvalue
 

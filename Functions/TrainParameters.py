@@ -15,7 +15,8 @@ class TrnParams(object):
     def __init__(self, analysis="None"):
         self.analysis = analysis
         self.params = None
-
+        self.resultsPath = None
+        
     def save(self, name="None"):
         joblib.dump([self.params],name,compress=9)
 
@@ -25,7 +26,9 @@ class TrnParams(object):
     def printParams(self):
         for iparameter in self.params:
             print iparameter + ': ' + str(self.params[iparameter])
-
+    
+    def getResultsPath(self):
+        self.resultsPath = ''
 
 # classification
 

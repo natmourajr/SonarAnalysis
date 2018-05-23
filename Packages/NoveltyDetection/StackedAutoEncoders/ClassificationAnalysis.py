@@ -1,10 +1,14 @@
 import os
 import sys
+sys.path.insert(0,'..')
+
+from noveltyDetectionConfig import CONFIG
+
 import pickle
 import numpy as np
 import time
-
 import argparse
+
 
 # Argument Parser config
 
@@ -63,8 +67,8 @@ print 'Time to import all libraries: '+str(m_time-init_time)+' seconds'
 analysis_name = 'StackedAutoEncoder'
 
 # Enviroment variables
-data_path = os.getenv('OUTPUTDATAPATH')
-results_path = os.getenv('PACKAGE_NAME')
+data_path = CONFIG['OUTPUTDATAPATH']
+results_path = CONFIG['PACKAGE_NAME']
 
 # paths to export results
 base_results_path = '%s/%s'%(results_path,analysis_name)
