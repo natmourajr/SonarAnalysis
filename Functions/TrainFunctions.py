@@ -7,6 +7,8 @@
 
 import os
 import pickle
+from abc import abstractmethod
+
 import numpy as np
 import time
 
@@ -25,6 +27,7 @@ from keras import backend as K
 import multiprocessing
 
 from Functions import TrainParameters as trnparams
+from Functions.TrainPaths import ConvolutionPaths, ModelPaths
 
 num_process = multiprocessing.cpu_count()
 
@@ -1367,3 +1370,215 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
         [trn_desc] = joblib.load(file_name)
 
     return [classifier,trn_desc]
+
+
+class ConvolutionTrainFunction(ConvolutionPaths):
+    def __init__(self):
+        # Path variables
+        super(ConvolutionTrainFunction, self).__init__()
+
+    def loadData(self, dataset):
+        """Load dataset for model use
+
+        Args:
+        dataset(tuple): (samples, labels, unique(labels))
+        """
+        self.dataset = dataset
+
+    def loadModels(self, model_list):
+        self.models = model_list
+
+    def loadFolds(self, n_folds):
+        file_name = '%s/%i_folds.jbl' % (self.results_path, n_folds)
+        print "Loading fold configuration"
+        self.fold_config = SystemIO.load(file_name)
+        self.n_folds = n_folds
+
+    def train(self, verbose=(0, 0, 0)):
+        # verify data structure
+        data, trgt, class_labels = self.dataset
+        # Generalize number of classes
+        n_classes = len(class_labels)
+
+        one_hot_trgt = PreProcessing.trgt2onehot(trgt, n_classes)
+
+        #             if self.scale:
+        #                 scaler function
+
+        # implement failsafe files
+        n_models = len(self.models)
+        for i_model, model in enumerate(self.models):
+            if verbose[0]:
+                print 'Model %i of %i' % (i_model, n_models)
+                model.pprint()
+
+            status = model.selectFoldConfig(self.n_folds)
+            if status is 'Trained':
+                print "Already trained for current fold configuration"
+                continue
+            elif status is 'Recovery':
+                print "Resuming Training"
+                # trained_folds = #load recovery file
+                raise NotImplementedError
+
+            for fold_count, train_index, test_index in enumerate(self.fold_config):
+                # if fold_count in trained_folds:
+                #    continue
+
+                if verbose[1]:
+                    print "Fold: " + str(fold_count) + '\n'
+
+                model.build(self.n_folds)
+                fold_history = self.model.fit(x_train, y_train, x_test, y_test, verbose[2])
+
+                # save model recovery
+                model.save(model.recovery_file)
+                # save model rec folds
+
+                fold_predictions = model.predict(data)
+                print fold_predictions
+                # SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.csv' % fold_count)
+
+                if not 'ModelCheckpoint' in model.callbacks:
+                    warnings.warn('ModelCheckpoint Callback not found for current model.')
+                    model.save(model.model_file)
+            # delete model recovery
+            # delete model fold recovery
+
+        if verbose[0]:
+            end = time.time()
+            print 'Training: %i (seg) / %i (min) /%i (hours)' % (end - start, (end - start) / 60, (end - start) / 3600)
+
+
+class _CNNModel(ModelPaths):
+    def __init__(self, trnParams):
+        if not isinstance(trnParams, TrnParamsConvolutional):
+            raise ValueError('The parameters inserted must be an instance of TrnPararamsCNN'
+                             '%s of type %s was passed.'
+                             % (trnParams, type(trnParams)))
+
+        self.model = None
+        self.params = None
+
+        self.path = ModelPaths(trnParams)
+        if SystemIO.exists(self.path.model_path):
+            trnParams = self.loadInfo()  # see __setstate__ and arb obj storage with joblib
+            self.mountParams(trnParams)
+        else:
+            self.createFolders(self.results_path + '/' + trnParams.getParamPath())
+            self.mountParams(trnParams)
+            self.saveParams(trnParams)
+
+    def summary(self):
+        raise NotImplementedError
+
+    def mountParams(self, trnParams):
+        for param, value in trnParams:
+            if param is None:
+                raise ValueError('The parameters configuration received by _CNNModel must be complete'
+                                 '%s was passed as NoneType.'
+                                 % (param))
+            setattr(self, param, value)
+
+        # self.model_name = trnParams.getParamStr()
+
+    def saveParams(self, trnParams):
+        SystemIO.save(trnParams.toNpArray(), self.path.model_info_file)
+
+    def loadInfo(self):
+        params_array = SystemIO.load(self.path.model_info_file)
+        return TrnParamsConvolutional(*params_array)
+
+    @abstractmethod
+    def load(self, file_path):
+        pass
+
+    @abstractmethod
+    def save(self, filepath):
+        pass
+
+    @abstractmethod
+    def build(self):
+        pass
+
+    @abstractmethod
+    def fit(self, x_train, y_train, validation_data=None, class_weight=None, verbose=0):
+        pass
+
+    @abstractmethod
+    def evaluate(self, x_test, y_test, verbose=0):
+        pass
+
+    @abstractmethod
+    def predict(self, data, verbose=0):
+        pass
+
+
+class KerasModel(_CNNModel):
+    def __init__(self, trnParams):
+        super(KerasModel, self).__init__(trnParams)
+
+    def build(self):
+        if self.model is not None:
+            warnings.warn('Model is not empty and was already trained.\n'
+                          'Run purge method for deleting the model variable',
+                          Warning)
+
+        self.purge()
+        self.model = Sequential()
+        for layer in self.layers:
+            self.model.add(layer.toKerasFn())
+
+        self.model.compile(optimizer=self.optimizer.toKerasFn(),
+                           loss=self.loss,
+                           metrics=self.metrics
+                           )
+
+    def fit(self, x_train, y_train, validation_data=None, class_weight=None, verbose=0):
+        if self.model is None:
+            raise StandardError('Model is not built. Run build method or load model before fitting')
+
+        history = self.model.fit(x_train,
+                                 y_train,
+                                 epochs=self.epochs,
+                                 batch_size=self.batch_size,
+                                 callbacks=self.callbacks.toKerasFn(),
+                                 validation_data=validation_data,
+                                 class_weight=class_weight,
+                                 verbose=verbose
+                                 )
+        self.history = history
+        return history
+
+    def evaluate(self, x_test, y_test, verbose=0):
+        if self.model is None:
+            raise StandardError('Model is not built. Run build method or load model before fitting')
+
+        val_history = self.model.evaluate(x_test,
+                                          y_test,
+                                          batch_size=self.batch_size,
+                                          verbose=verbose)
+        self.val_history = val_history
+        return val_history
+
+    def get_layer_n_output(self, n, data):
+        intermediate_layer_model = Model(inputs=self.model.input,
+                                         outputs=self.model.layers[n - 1].output)
+        intermediate_output = intermediate_layer_model.predict(data)
+        return intermediate_output
+
+    def predict(self, data, verbose=0):
+        if self.model is None:
+            raise StandardError('Model is not built. Run build method or load model before fitting')
+        return self.model.predict(data, 1, verbose)  # ,steps)
+
+    def load(self, file_path):
+        self.model = load_model(file_path)
+
+    def save(self, file_path):
+        self.model.save(file_path)
+
+    def purge(self):
+        del self.model
+
+
