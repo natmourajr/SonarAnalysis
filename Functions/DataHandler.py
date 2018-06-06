@@ -1,7 +1,7 @@
 """ 
   This file contents all log functions
 """
-
+import keras
 import numpy as np
 import numpy.random as np_rnd
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -22,6 +22,10 @@ class DataHandlerFunctions(object):
                 appended_data = data[np_rnd.random_integers(0, data.shape[0] - 1, size=n_events), :]
                 return_data = np.append(data, appended_data, axis=0)
                 return return_data
+
+
+def trgt2categorical(trgt, n_classes):
+    return keras.utils.to_categorical(trgt, num_classes=n_classes)
 
 
 def lofar2image(all_data, all_trgt, class_labels, class_window, stride, verbose=False, filepath='./lofar_images', dtype = np.float64):
@@ -70,48 +74,48 @@ def Kfold(dataset, k, shuffle=False, stratify=False):
     return kf.split(data)
 
 
-class SonarRunsKFold(BaseCrossValidator):
-    INPUTDATAPATH = '/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification/4classes'
-    # dicionario mapeando os runs de origem para os indices dos dados
-    RUNSMAPPING = {'ClassA': {
-        }
-        'ClassB': {
-        }
-        'ClassC': {
-        }
-        'ClassD': {
-        }
-    }
-
-    def __init__(self, shuffle=True):
-        super(SonarRunsKFold, self).__init__()
-        self.shuffle = shuffle
-
-    def _iter_test_indices(self, X=None, y=None, groups=None):
-        def clean_list(folder_list):
-            for folder in folder_list:
-                if folder[0] != '.':
-                    yield folder
-
-        run_dict = dict()
-        class_folders = os.listdir(self.INPUTDATAPATH)
-        for class_folder in clean_list(class_folders):
-            run_files = os.listdir(self.INPUTDATAPATH + '/' + class_folder)
-            run_files = list(clean_list(run_files))
-
-            if self.shuffle:
-                run_files = shuffle(run_files)
-
-            run_dict[class_folder] = run_files
-
-        # get class with minimum number of runs
-        ref_class_i = np.argmin(map(len, run_dict.values()))
-        ref_class = run_dict.keys()[ref_class_i]
-
-        self.n_splits = len(run_dict[ref_class])
-
-        # class_slices = _getClassSlices(run_dict, ref_class)
-
-    def _getClassSlices(self, run_dict, ref_class):
-        raise NotImplementedError
+# class SonarRunsKFold(BaseCrossValidator):
+#     INPUTDATAPATH = '/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification/4classes'
+#     # dicionario mapeando os runs de origem para os indices dos dados
+#     RUNSMAPPING = {'ClassA': {
+#         }
+#         'ClassB': {
+#         }
+#         'ClassC': {
+#         }
+#         'ClassD': {
+#         }
+#     }
+#
+#     def __init__(self, shuffle=True):
+#         super(SonarRunsKFold, self).__init__()
+#         self.shuffle = shuffle
+#
+#     def _iter_test_indices(self, X=None, y=None, groups=None):
+#         def clean_list(folder_list):
+#             for folder in folder_list:
+#                 if folder[0] != '.':
+#                     yield folder
+#
+#         run_dict = dict()
+#         class_folders = os.listdir(self.INPUTDATAPATH)
+#         for class_folder in clean_list(class_folders):
+#             run_files = os.listdir(self.INPUTDATAPATH + '/' + class_folder)
+#             run_files = list(clean_list(run_files))
+#
+#             if self.shuffle:
+#                 run_files = shuffle(run_files)
+#
+#             run_dict[class_folder] = run_files
+#
+#         # get class with minimum number of runs
+#         ref_class_i = np.argmin(map(len, run_dict.values()))
+#         ref_class = run_dict.keys()[ref_class_i]
+#
+#         self.n_splits = len(run_dict[ref_class])
+#
+#         # class_slices = _getClassSlices(run_dict, ref_class)
+#
+#     def _getClassSlices(self, run_dict, ref_class):
+#         raise NotImplementedError
 

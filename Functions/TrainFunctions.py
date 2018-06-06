@@ -7,6 +7,7 @@
 
 import os
 import pickle
+import warnings
 from abc import abstractmethod
 
 import numpy as np
@@ -22,11 +23,12 @@ from keras.optimizers import Adam, SGD
 import keras.callbacks as callbacks
 from keras.utils import np_utils
 from keras.models import load_model
-from keras import backend as K
+from keras import backend as K, Model
 
 import multiprocessing
 
-from Functions import TrainParameters as trnparams
+from Functions import TrainParameters as trnparams, SystemIO, DataHandler
+from Functions.TrainParameters import TrnParamsConvolutional
 from Functions.TrainPaths import ConvolutionPaths, ModelPaths
 
 num_process = multiprocessing.cpu_count()
@@ -1400,7 +1402,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         # Generalize number of classes
         n_classes = len(class_labels)
 
-        one_hot_trgt = PreProcessing.trgt2onehot(trgt, n_classes)
+        categorical_trgt = DataHandler.trgt2categorical(trgt, n_classes)
 
         #             if self.scale:
         #                 scaler function
@@ -1421,9 +1423,13 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 # trained_folds = #load recovery file
                 raise NotImplementedError
 
+            start = time.time()
             for fold_count, train_index, test_index in enumerate(self.fold_config):
                 # if fold_count in trained_folds:
                 #    continue
+
+                x_train, y_train = data[train_index], categorical_trgt[train_index]
+                x_test, y_test = data[test_index], categorical_trgt[test_index]
 
                 if verbose[1]:
                     print "Fold: " + str(fold_count) + '\n'
@@ -1437,17 +1443,19 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
                 fold_predictions = model.predict(data)
                 print fold_predictions
+                print fold_history
                 # SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.csv' % fold_count)
 
                 if not 'ModelCheckpoint' in model.callbacks:
                     warnings.warn('ModelCheckpoint Callback not found for current model.')
                     model.save(model.model_file)
+
             # delete model recovery
             # delete model fold recovery
 
-        if verbose[0]:
-            end = time.time()
-            print 'Training: %i (seg) / %i (min) /%i (hours)' % (end - start, (end - start) / 60, (end - start) / 3600)
+            if verbose[0]:
+                end = time.time()
+                print 'Training: %i (seg) / %i (min) /%i (hours)' % (end - start, (end - start) / 60, (end - start) / 3600)
 
 
 class _CNNModel(ModelPaths):
@@ -1580,5 +1588,3 @@ class KerasModel(_CNNModel):
 
     def purge(self):
         del self.model
-
-
