@@ -1460,6 +1460,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
 class _CNNModel(ModelPaths):
     def __init__(self, trnParams):
+        super(_CNNModel, self).__init__(trnParams)
         if not isinstance(trnParams, TrnParamsConvolutional):
             raise ValueError('The parameters inserted must be an instance of TrnPararamsCNN'
                              '%s of type %s was passed.'

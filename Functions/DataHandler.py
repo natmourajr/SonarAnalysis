@@ -1,11 +1,19 @@
 """ 
   This file contents all log functions
 """
+import contextlib
+import wave
+
 import keras
 import numpy as np
 import numpy.random as np_rnd
+import os
+
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.model_selection._split import BaseCrossValidator
+from sklearn.utils import shuffle
+
+from Functions.SystemIO import filterPaths, listfolders
 
 
 class DataHandlerFunctions(object):
@@ -74,48 +82,59 @@ def Kfold(dataset, k, shuffle=False, stratify=False):
     return kf.split(data)
 
 
-# class SonarRunsKFold(BaseCrossValidator):
-#     INPUTDATAPATH = '/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification/4classes'
-#     # dicionario mapeando os runs de origem para os indices dos dados
-#     RUNSMAPPING = {'ClassA': {
-#         }
-#         'ClassB': {
-#         }
-#         'ClassC': {
-#         }
-#         'ClassD': {
-#         }
-#     }
-#
-#     def __init__(self, shuffle=True):
-#         super(SonarRunsKFold, self).__init__()
-#         self.shuffle = shuffle
-#
-#     def _iter_test_indices(self, X=None, y=None, groups=None):
-#         def clean_list(folder_list):
-#             for folder in folder_list:
-#                 if folder[0] != '.':
-#                     yield folder
-#
-#         run_dict = dict()
-#         class_folders = os.listdir(self.INPUTDATAPATH)
-#         for class_folder in clean_list(class_folders):
-#             run_files = os.listdir(self.INPUTDATAPATH + '/' + class_folder)
-#             run_files = list(clean_list(run_files))
-#
-#             if self.shuffle:
-#                 run_files = shuffle(run_files)
-#
-#             run_dict[class_folder] = run_files
-#
-#         # get class with minimum number of runs
-#         ref_class_i = np.argmin(map(len, run_dict.values()))
-#         ref_class = run_dict.keys()[ref_class_i]
-#
-#         self.n_splits = len(run_dict[ref_class])
-#
-#         # class_slices = _getClassSlices(run_dict, ref_class)
-#
-#     def _getClassSlices(self, run_dict, ref_class):
-#         raise NotImplementedError
+class SonarRunsKFold(BaseCrossValidator):
+    INPUTDATAPATH = '/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification/4classes'
+
+    def __init__(self, shuffle=True):
+        super(SonarRunsKFold, self).__init__()
+        self.shuffle = shuffle
+
+    def _iter_test_indices(self, X=None, y=None, groups=None, dev = False):
+        run_dict = dict()
+        class_offset = 0
+        for class_folder in listfolders(self.INPUTDATAPATH):
+            run_files = listfolders(self.INPUTDATAPATH + '/' + class_folder)
+            run_paths = map(lambda x: self.INPUTDATAPATH + '/' + class_folder + '/' + x, run_files)
+            run_indexes = list(self._iterClassIndices(run_paths, class_offset, 1024))
+
+            if dev:
+                offsets = list(map(lambda x: x[0], run_indexes))
+                lengths = list(map(len, run_indexes))
+                print class_folder
+                print "\tLength\tOffset"
+                for (i, length), offset in zip(enumerate(lengths), offsets):
+                    print "Run %i:\t%i\t%i" % (i,length, offset)
+                print "Total: \t%i\n" % (sum(lengths))
+
+            class_offset = class_offset + sum(map(len, run_indexes))
+
+            run_dict[class_folder] = run_indexes
+        return run_dict
+        #     if self.shuffle:
+        #         run_files = shuffle(run_files)
+        #
+        #     run_dict[class_folder] = run_files
+        #
+        # # get class with minimum number of runs
+        # ref_class_i = np.argmin(map(len, run_dict.values()))
+        # ref_class = run_dict.keys()[ref_class_i]
+
+        #self.n_splits = len(run_dict[ref_class])
+
+    def _iterClassIndices(self, runpaths, class_offset, window):
+        run_offset = 0
+        for run in runpaths:
+            run_indices = self._getRunIndices(run, class_offset + run_offset, window)
+            run_offset += len(run_indices)
+            yield run_indices
+
+    def _getRunIndices(self, runfile, offset, window):
+        with contextlib.closing(wave.open(runfile, 'r')) as runfile:
+            frames = runfile.getnframes()
+            end_frame = frames / window + offset
+
+        return range(offset, end_frame)
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        raise NotImplementedError
 

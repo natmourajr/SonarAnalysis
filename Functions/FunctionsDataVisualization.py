@@ -102,14 +102,14 @@ def plotMetrics(y,
     raise NotImplementedError
 
 
-def plotLOFARgram(image):
+def plotLOFARgram(image,filename = None):
     """Plot LOFARgram from an array of frequency spectre values
 
     Args:
     image (numpy.array): Numpy array with the frequency spectres along the second axis
     """
 
-#    fig = plt.subplots(figsize=(20, 20))
+    fig = plt.subplots(figsize=(20, 20))
     plt.rcParams['font.weight'] = 'bold'
     plt.rcParams['font.size'] = 30
     plt.rcParams['xtick.labelsize'] = 30
@@ -122,4 +122,7 @@ def plotLOFARgram(image):
     plt.xlabel('Frequency bins', fontweight='bold')
     plt.ylabel('Time (seconds)', fontweight='bold')
 
-    plt.show
+    if not filename is None:
+        plt.savefig(filename)
+
+    return plt

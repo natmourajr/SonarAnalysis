@@ -1,7 +1,8 @@
 import os
+import numpy as np
 from warnings import warn
 
-from Functions.SystemIO import mkdir, exists
+from Functions.SystemIO import mkdir, exists, load
 from Functions.TrainParameters import TrnParamsConvolutional
 
 
@@ -9,9 +10,7 @@ class _Path(object):
     MODEL_INFO_FILE_NAME = 'model_info.jbl'
     MODEL_STATE_FILE_NAME = 'model_state.h5'
 
-    def __init__(self, home):
-        # self.subfolders = dict()
-        # self.subfolders['home'] = home
+    def __init__(self):
         pass
 
     def add(self, subfolder):
@@ -28,8 +27,8 @@ class ConvolutionPaths(_Path):
     required for the convolution models training and analysis"""
     results_path = './Analysis'
 
-    def __init__(self, home):
-        super(ConvolutionPaths, self).__init__(home)
+    def __init__(self):
+        super(ConvolutionPaths, self).__init__()
         self.model_paths = self.getModelPaths(self.results_path)
 
     def getModelPaths(self, init_path):
@@ -55,8 +54,10 @@ class ConvolutionPaths(_Path):
 
 
 class ModelPaths(ConvolutionPaths):
-    def __init__(self, trnParams, home):
-        super(ModelPaths, self).__init__(home)
+    """Class with references to all sub-folders(models and results)
+        required for the models training """
+    def __init__(self, trnParams):
+        super(ModelPaths, self).__init__()
         if not isinstance(trnParams, TrnParamsConvolutional):
             raise ValueError('The parameters inserted must be an instance of TrnPararamsConvolutional'
                              '%s of type %s was passed.'
@@ -89,12 +90,13 @@ class ModelPaths(ConvolutionPaths):
         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
 
+        print self.model_file
         if exists(self.model_file):
             return 'Trained'
         # elif exists(self.model_recovery_state):
         #   return 'Recovery'
         else:
-            self.createFolders(self.model_path)
+            self.createFolders(self.fold_path)
             return 'Untrained'
 
     def createFolders(self, *args):
