@@ -1,7 +1,7 @@
 import joblib
 import datetime
 import os
-
+import shutil
 
 def save(file, filepath):
     joblib.dump(file, filepath)
@@ -15,7 +15,10 @@ def exists(filepath):
     return os.path.exists(filepath)
 
 
-def remove(filepath):
+def remove(filepath, recursive = False):
+    if recursive:
+        shutil.rmtree(filepath)
+        return
     os.remove(filepath)
 
 

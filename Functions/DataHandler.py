@@ -85,9 +85,15 @@ def Kfold(dataset, k, shuffle=False, stratify=False):
 class SonarRunsKFold(BaseCrossValidator):
     INPUTDATAPATH = '/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification/4classes'
 
-    def __init__(self, shuffle=True):
+    def __init__(self,
+                 validation_runs = {'ClassA': 1,
+                                    'ClassB': 2,
+                                    'ClassC': 2,
+                                    'ClassD': 2},
+                 shuffle=True):
         super(SonarRunsKFold, self).__init__()
         self.shuffle = shuffle
+        self.validation_runs = validation_runs
 
     def _iter_test_indices(self, X=None, y=None, groups=None, dev = False):
         run_dict = dict()
@@ -108,18 +114,71 @@ class SonarRunsKFold(BaseCrossValidator):
 
             class_offset = class_offset + sum(map(len, run_indexes))
 
+            if self.shuffle:
+                run_indexes = shuffle(run_indexes)
+
+            run_dict[class_folder] = run_indexes
+
+        # get class with minimum number of runs
+        ref_class_i = np.argmin(map(len, run_dict.values()))
+        n_folds = len(run_dict.values()[ref_class_i]) # number of folds will be limited by
+                                                     # the class with minimum number of runs
+        if dev:
+            print "Total: %i" % n_folds
+
+        for fold in range(n_folds):
+            #DEBUG
+            if dev:
+                print "Fold %i" % fold
+                val_indices = np.array([], dtype=np.int)
+
+            test_indices = np.array([], dtype=np.int)
+            for cls_key in run_dict:
+                val_runs = self.validation_runs[cls_key]  # number of runs for validation set
+                class_runs = run_dict[cls_key]
+
+                #DEBUG
+                if dev:
+                    print "\t%s: Inf: %i \t Sup: %i" % (cls_key, fold*val_runs, val_runs*(fold + 1))
+                    val_check = np.concatenate(class_runs[fold*val_runs:val_runs*(fold + 1)])
+                    val_indices = np.concatenate((val_indices, val_check))
+
+                test_runs = class_runs[:fold*val_runs] + class_runs[val_runs*(fold + 1):] # cutout val runs
+                test_runs = np.concatenate(test_runs)
+                test_indices = np.concatenate((test_indices,test_runs))
+
+            if dev:
+                total = test_indices.shape[0] + val_indices.shape[0]
+                test_per, val_per = 100*test_indices.shape[0]/total, 100*val_indices.shape[0]/total
+                print "\n\tSamples -> Train: %i (%i%%)  Val: %i (%i%%)  Total: %i\n" % \
+                      (test_indices.shape[0], test_per, val_indices.shape[0], val_per, total)
+
+            yield test_indices
+
+        if dev:
+            yield run_dict
+
+    def _iter_test_indices_old(self, X=None, y=None, groups=None, dev = False):
+        run_dict = dict()
+        class_offset = 0
+        for class_folder in listfolders(self.INPUTDATAPATH):
+            run_files = listfolders(self.INPUTDATAPATH + '/' + class_folder)
+            run_paths = map(lambda x: self.INPUTDATAPATH + '/' + class_folder + '/' + x, run_files)
+            run_indexes = list(self._iterClassIndices(run_paths, class_offset, 1024))
+
+            if dev:
+                offsets = list(map(lambda x: x[0], run_indexes))
+                lengths = list(map(len, run_indexes))
+                print class_folder
+                print "\tLength\tOffset"
+                for (i, length), offset in zip(enumerate(lengths), offsets):
+                    print "Run %i:\t%i\t%i" % (i,length, offset)
+                print "Total: \t%i\n" % (sum(lengths))
+
+            class_offset = class_offset + sum(map(len, run_indexes))
+
             run_dict[class_folder] = run_indexes
         return run_dict
-        #     if self.shuffle:
-        #         run_files = shuffle(run_files)
-        #
-        #     run_dict[class_folder] = run_files
-        #
-        # # get class with minimum number of runs
-        # ref_class_i = np.argmin(map(len, run_dict.values()))
-        # ref_class = run_dict.keys()[ref_class_i]
-
-        #self.n_splits = len(run_dict[ref_class])
 
     def _iterClassIndices(self, runpaths, class_offset, window):
         run_offset = 0
@@ -137,4 +196,3 @@ class SonarRunsKFold(BaseCrossValidator):
 
     def get_n_splits(self, X=None, y=None, groups=None):
         raise NotImplementedError
-
