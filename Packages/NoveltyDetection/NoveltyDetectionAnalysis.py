@@ -37,14 +37,12 @@ class NoveltyDetectionAnalysis(object):
         self.num_processes = multiprocessing.cpu_count()
         
         # Enviroment variables
-        self.data_path = CONFIG['OUTPUTDATAPATH']
-        self.results_path = CONFIG['PACKAGE_NAME']
+        self.DATA_PATH = CONFIG['OUTPUTDATAPATH']
+        self.RESULTS_PATH = CONFIG['PACKAGE_NAME']
 
         # paths to export results
-        self.base_results_path = '%s/%s'%(self.results_path,self.analysis_name)
-        self.pict_results_path = '%s/pictures_files'%(self.base_results_path)
-        self.files_results_path = '%s/output_files'%(self.base_results_path)
-
+        self.base_results_path = os.path.join(self.RESULTS_PATH,self.analysis_name)
+        
         # Database caracteristics
         self.database = database
         self.n_pts_fft = n_pts_fft
@@ -56,20 +54,19 @@ class NoveltyDetectionAnalysis(object):
         self.verbose = verbose
         
         # Check if LofarData has already been created...
-        if not os.path.exists('%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl'%(self.data_path,
-                                                                                                 self.database,
-                                                                                                 self.n_pts_fft,
-                                                                                                 self.decimation_rate,
-                                                                                                 self.spectrum_bins_left)):
-            print 'No Files in %s/%s\n'%(self.data_path,
+        data_file = os.path.join(self.DATA_PATH,self.database,
+                                 "lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl"%(self.n_pts_fft,
+                                                                                              self.decimation_rate,
+                                                                                              self.spectrum_bins_left
+                                                                                             )
+                                )
+        
+        if not os.path.exists(data_file):
+            print 'No Files in %s/%s\n'%(self.DATA_PATH,
                                          self.database)
         else:
             #Read lofar data
-            [data,trgt,class_labels] = joblib.load('%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl'%(self.data_path,
-                                                                                                 self.database,
-                                                                                                 self.n_pts_fft,
-                                                                                                 self.decimation_rate,
-                                                                                                 self.spectrum_bins_left))
+            [data,trgt,class_labels] = joblib.load(data_file)
 
 
             m_time = time.time()-m_time
@@ -113,7 +110,7 @@ class NoveltyDetectionAnalysis(object):
 
         for iclass, class_label in enumerate(self.class_labels):
             if self.development_flag:
-                class_events = self.all_data[all_trgt==iclass,:]
+                class_events = self.all_data[self.all_trgt==iclass,:]
                 if len(balanced_data) == 0:
                     balanced_data = class_events[0:self.development_events,:]
                     balanced_trgt = (iclass)*np.ones(self.development_events)

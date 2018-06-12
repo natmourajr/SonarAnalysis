@@ -13,7 +13,7 @@ from sklearn import preprocessing
 from sklearn import metrics
 
 from keras.models import Sequential
-from keras.regularizers import l1, l2
+from keras import regularizers
 from keras.layers.core import Dense, Activation, Dropout
 from keras.optimizers import Adam, SGD
 import keras.callbacks as callbacks
@@ -38,6 +38,7 @@ class StackedAutoEncoders:
         self.save_path        = save_path
         self.noveltyDetection = noveltyDetection
         self.allow_change_weights = allow_change_weights
+        self.inovelty = inovelty
 
         self.n_inits          = self.trn_params.params['n_inits']
         self.params_str       = self.trn_params.get_params_str()
@@ -106,15 +107,13 @@ class StackedAutoEncoders:
         if layer == 1:
             neurons_str = self.getNeuronsString(data, hidden_neurons[:layer])
             if regularizer != None and len(regularizer) != 0:
-                previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%.6f)'%(self.save_path, self.analysis_str,
-                                                                                           self.prefix_str, self.n_folds,
-                                                                                           self.params_str, neurons_str,
-                                                                                           regularizer, regularizer_param)
+                previous_model_str = os.path.join(self.save_path,
+                                                  "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                                 )
                 
             else:
-                previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                                        self.prefix_str, self.n_folds,
-                                                                        self.params_str, neurons_str)
+                previous_model_str = os.path.join(self.save_path,"saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+                
             if not self.development_flag:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
@@ -139,14 +138,12 @@ class StackedAutoEncoders:
             for ilayer in range(1,layer+1):
                 neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
                 if regularizer != None and len(regularizer) != 0:
-                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%.6f)'%(self.save_path, self.analysis_str,
-                                                                                               self.prefix_str, self.n_folds,
-                                                                                               self.params_str, neurons_str,
-                                                                                               regularizer, regularizer_param)
+                    
+                    previous_model_str = os.path.join(self.save_path,
+                                                      "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                                     )
                 else:
-                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                                            self.prefix_str, self.n_folds,
-                                                                            self.params_str, neurons_str)
+                    previous_model_str = os.path.join(self.save_path,"saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
                 if not self.development_flag:
                     file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
                 else:
@@ -219,19 +216,21 @@ class StackedAutoEncoders:
         # Add layers
         for ilayer in range(1,layer+1):
              # Get the weights of ilayer
-            neurons_str = self.getNeuronsString(data,hidden_neurons[:ilayer])
-            previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path,
-                                                                    self.analysis_str,
-                                                                    self.prefix_str,
-                                                                    self.n_folds,
-                                                                    self.params_str,
-                                                                    neurons_str)
-
+            
+            neurons_str = self.getNeuronsString(data, hidden_neurons[:layer])
+            if regularizer != None and len(regularizer) != 0:
+                previous_model_str = os.path.join(self.save_path,
+                                                  "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                                 )
+                
+            else:
+                previous_model_str = os.path.join(self.save_path,"saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+                
             if not self.development_flag:
                 file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
             else:
                 file_name = '%s_fold_%i_model_dev.h5'%(previous_model_str,ifold)
-
+                
             # Check if the layer was trained
             if not os.path.exists(file_name):
                 self.trainLayer(data=data,
@@ -253,121 +252,6 @@ class StackedAutoEncoders:
             model.add(Activation(self.trn_params.params['hidden_activation']))
 
         return model
-    '''
-        Method that implements different types of training through interfacing other methods
-    '''
-    def train(self, fineTuning=False, trainingType="normal", data=None, trgt=None, ifold=0, hidden_neurons=[1], neurons_mat=[], layer=1, regularizer=None, regularizer_param=None):
-            if (trainingType == "normal"):
-                if (fineTuning):
-                    # Do fine tuning training step for specified layer
-                    return self.trainClassifier(data=data, trgt=trgt, ifold=ifold, hidden_neurons=hidden_neurons, layer=layer, regularizer=regularizer, regularizer_param=regularizer_param)
-                else:
-                    # Train autoencoder for specified layer
-                    return self.trainLayer(data=data, trgt=trgt, ifold=ifold, hidden_neurons=hidden_neurons, layer=layer, regularizer=regularizer, regularizer_param=regularizer_param)
-            elif (trainingType == "neuronSweep"):
-                if (not neurons_mat):
-                    print "[-] Neurons matrix should not be empty for this type of training"
-                    return None
-                if (fineTuning):
-                    def train(ineuron):
-                        self.trainClassifier(data  = data,
-                                            trgt  = trgt,
-                                            ifold = ifold,
-                                            hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                                            layer = layer,
-                                            regularizer=regularizer,
-                                            regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, neurons_mat)
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ineuron):
-                        self.trainLayer(data  = data,
-                                        trgt  = trgt,
-                                        ifold = ifold,
-                                        hidden_neurons = hidden_neurons[:layer-1] + [ineuron],
-                                        layer = layer,
-                                        regularizer=regularizer,
-                                        regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, neurons_mat)
-
-                    p.close()
-                    p.join()
-            elif (trainingType == "layerSweep"):
-                if (fineTuning):
-                    def train(ilayer):
-                        self.trainClassifier(data  = data,
-                                             trgt  = trgt,
-                                             ifold = ifold,
-                                             hidden_neurons = hidden_neurons[:ilayer-1],
-                                             layer = ilayer,
-                                             regularizer=regularizer,
-                                             regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(1,layer+1))
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ilayer):
-                        self.trainLayer(data  = data,
-                                        trgt  = trgt,
-                                        ifold = ifold,
-                                        hidden_neurons = hidden_neurons[:ilayer-1],
-                                        layer = ilayer,
-                                        regularizer=regularizer,
-                                        regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(1,layer+1))
-
-                    p.close()
-                    p.join()
-            elif (trainingType == "foldSweep"):
-                if (fineTuning):
-                    def train(fold):
-                        self.trainClassifier(data  = data,
-                                             trgt  = trgt,
-                                             ifold = fold,
-                                             hidden_neurons = hidden_neurons,
-                                             layer = layer,
-                                             regularizer=regularizer,
-                                             regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(len(self.CVO)))
-
-                    p.close()
-                    p.join()
-                else:
-                    def train(ilayer):
-                        self.trainLayer(data  = data,
-                                        trgt  = trgt,
-                                        ifold = fold,
-                                        hidden_neurons = hidden_neurons,
-                                        layer = layer,
-                                        regularizer=regularizer,
-                                        regularizer_param=regularizer_param)
-                    p = multiprocessing.Pool(processes=num_processes)
-
-                    results = p.map(train, range(len(self.CVO)))
-
-                    p.close()
-                    p.join()
-            else:
-                print "[-] %s is not set as a type of training"
-                return None
-
-    
-    
-    
-    
     
 
     '''
@@ -385,17 +269,16 @@ class StackedAutoEncoders:
         if self.trn_params.params['verbose']:
             print '[+] Using %s as optmizer algorithm'%self.trn_params.params['optmizerAlgorithm']
 
-        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer])
-
+        
+        neurons_str = self.getNeuronsString(data, hidden_neurons[:layer])
         if regularizer != None and len(regularizer) != 0:
-            model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%.6f)'%(self.save_path, self.analysis_str,
-                                                                              self.prefix_str, self.n_folds,
-                                                                              self.params_str, neurons_str,
-                                                                              regularizer, regularizer_param)
+            model_str = os.path.join(self.save_path,
+                                              "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                    )
+
         else:
-            model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                           self.prefix_str, self.n_folds,
-                                                           self.params_str, neurons_str)
+            model_str = os.path.join(self.save_path,"saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+        
         if not self.development_flag:
             file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
             if os.path.exists(file_name):
@@ -448,14 +331,13 @@ class StackedAutoEncoders:
                 for ilayer in range(1,layer):
                     neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
                     if regularizer != None and len(regularizer) != 0:
-                        previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%.6f)'%(self.save_path, self.analysis_str,
-                                                                                                   self.prefix_str, self.n_folds,
-                                                                                                   self.params_str, neurons_str,
-                                                                                                   regularizer, regularizer_param)
+                        previous_model_str = os.path.join(self.save_path,
+                                                          "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                                         )
+
                     else:
-                        previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                                                self.prefix_str, self.n_folds,
-                                                                                self.params_str, neurons_str)
+                        previous_model_str = os.path.join(self.save_path, "saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+                        
                     if not self.development_flag:
                         file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
                     else:
@@ -559,20 +441,12 @@ class StackedAutoEncoders:
         neurons_str = self.getNeuronsString(data,hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
 
         if regularizer != None and len(regularizer) != 0:
-            model_str = '%s/%s/Classifier_(%s)_%s_%i_folds_%s_%s_regularizer(%.6f)'%(self.save_path,
-                                                                                    self.analysis_str,
-                                                                                    neurons_str,
-                                                                                    self.prefix_str,
-                                                                                    self.n_folds,
-                                                                                    self.params_str,
-                                                                                    regularizer, regularizer_param)
+            previous_model_str = os.path.join(self.save_path,
+                                              "classifierModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                             )
+
         else:
-            model_str = '%s/%s/Classifier_(%s)_%s_%i_folds_%s'%(self.save_path,
-                                                                self.analysis_str,
-                                                                neurons_str,
-                                                                self.prefix_str,
-                                                                self.n_folds,
-                                                                self.params_str)
+            previous_model_str = os.path.join(self.save_path,"classifierModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
 
         classifier = {}
         if not self.development_flag:
@@ -606,23 +480,16 @@ class StackedAutoEncoders:
         # Turn trgt to one-hot encoding
         trgt_sparse = np_utils.to_categorical(trgt.astype(int))
 
-        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
+        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer])
 
         if regularizer != None and len(regularizer) != 0:
-            model_str = '%s/%s/Classifier_(%s)_%s_%i_folds_%s_%s_regularizer(%.6f)'%(self.save_path,
-                                                                                    self.analysis_str,
-                                                                                    neurons_str,
-                                                                                    self.prefix_str,
-                                                                                    self.n_folds,
-                                                                                    self.params_str,
-                                                                                    regularizer, regularizer_param)
+            model_str = os.path.join(self.save_path,
+                                              "classifierModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                             )
+
         else:
-            model_str = '%s/%s/Classifier_(%s)_%s_%i_folds_%s'%(self.save_path,
-                                                                self.analysis_str,
-                                                                neurons_str,
-                                                                self.prefix_str,
-                                                                self.n_folds,
-                                                                self.params_str)
+            model_str = os.path.join(self.save_path,"classifierModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+                                                          
         if not self.development_flag:
             file_name = '%s_fold_%i_model.h5'%(model_str,ifold)
             if os.path.exists(file_name):
@@ -670,14 +537,12 @@ class StackedAutoEncoders:
                  # Get the weights of ilayer
                 neurons_str = self.getNeuronsString(data, hidden_neurons[:ilayer])
                 if regularizer != None and len(regularizer) != 0:
-                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons_%s_regularizer(%.6f)'%(self.save_path, self.analysis_str,
-                                                                                               self.prefix_str, self.n_folds,
-                                                                                               self.params_str, neurons_str,
-                                                                                               regularizer, regularizer_param)
+                    previous_model_str = os.path.join(self.save_path,
+                                                      "saeModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
+                                                     )
+
                 else:
-                    previous_model_str = '%s/%s/%s_%i_folds_%s_%s_neurons'%(self.save_path, self.analysis_str,
-                                                                            self.prefix_str, self.n_folds,
-                                                                            self.params_str, neurons_str)
+                    previous_model_str = os.path.join(self.save_path,"saeModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
 
                 if not self.development_flag:
                     file_name = '%s_fold_%i_model.h5'%(previous_model_str,ifold)
