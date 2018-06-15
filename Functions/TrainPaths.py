@@ -32,7 +32,10 @@ class ConvolutionPaths(_Path):
         self.model_paths = self.getModelPaths(self.results_path)
 
     def getModelPaths(self, init_path):
-        path_list = os.listdir(init_path)
+        try:
+           path_list = os.listdir(init_path)
+        except OSError:
+            return
 
         if self.MODEL_INFO_FILE_NAME in path_list:
             return init_path
@@ -85,10 +88,11 @@ class ModelPaths(ConvolutionPaths):
         self.fold_path = self.model_path + '/' + '%i_folds' % n_folds
 
         self.model_file = self.fold_path + '/' + 'model_state.h5'
-        self.model_history = self.fold_path + '/' + 'history.csv'
+        self.model_history = self.fold_path + '/' + 'history'
         self.model_predictions = self.fold_path + '/' + 'predictions'
         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
+
 
         print self.model_file
         if exists(self.model_file):
@@ -96,7 +100,7 @@ class ModelPaths(ConvolutionPaths):
         # elif exists(self.model_recovery_state):
         #   return 'Recovery'
         else:
-            self.createFolders(self.fold_path)
+            self.createFolders(self.fold_path, self.model_history, self.model_predictions)
             return 'Untrained'
 
     def createFolders(self, *args):

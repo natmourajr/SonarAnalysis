@@ -1387,8 +1387,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         """
         self.dataset = dataset
 
-    def loadModels(self, model_list):
-        self.models = model_list
+    def loadModels(self, model_list, model_initializer):
+        self.models = [model_initializer(model) for model in model_list]
 
     def loadFolds(self, n_folds):
         file_name = '%s/%i_folds.jbl' % (self.results_path, n_folds)
@@ -1411,8 +1411,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         n_models = len(self.models)
         for i_model, model in enumerate(self.models):
             if verbose[0]:
-                print 'Model %i of %i' % (i_model, n_models)
-                model.pprint()
+                print 'Model %i of %i' % (i_model + 1, n_models)
+                #model.pprint()
 
             status = model.selectFoldConfig(self.n_folds)
             if status is 'Trained':
@@ -1424,7 +1424,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 raise NotImplementedError
 
             start = time.time()
-            for fold_count, train_index, test_index in enumerate(self.fold_config):
+            for fold_count, (train_index, test_index) in enumerate(self.fold_config):
                 # if fold_count in trained_folds:
                 #    continue
 
@@ -1434,17 +1434,18 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 if verbose[1]:
                     print "Fold: " + str(fold_count) + '\n'
 
-                model.build(self.n_folds)
-                fold_history = self.model.fit(x_train, y_train, x_test, y_test, verbose[2])
+                model.build()
+                fold_history = model.fit(x_train, y_train, validation_data=(x_test, y_test), verbose=verbose[2])
 
                 # save model recovery
-                model.save(model.recovery_file)
+                #model.save(model.recovery_file)
                 # save model rec folds
 
                 fold_predictions = model.predict(data)
-                print fold_predictions
-                print fold_history
-                # SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.csv' % fold_count)
+                print len(fold_predictions)
+                print len(fold_history.history)
+                SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.csv' % fold_count)
+                SystemIO.save(fold_predictions, model.model_history + '/' + '%i_fold.csv' % fold_count)
 
                 if not 'ModelCheckpoint' in model.callbacks:
                     warnings.warn('ModelCheckpoint Callback not found for current model.')
@@ -1556,7 +1557,7 @@ class KerasModel(_CNNModel):
                                  class_weight=class_weight,
                                  verbose=verbose
                                  )
-        self.history = history
+        self.history = history.history
         return history
 
     def evaluate(self, x_test, y_test, verbose=0):
