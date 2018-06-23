@@ -3,6 +3,10 @@
 '''
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+
 def add_subplot_axes(ax,rect,axisbg='w'):
     fig = plt.gcf()
     box = ax.get_position()
@@ -51,7 +55,7 @@ def plotConfusionMatrix(confusionMatrix,
     """
 
     if normalize:
-        cm = confusionMatrix = confusionMatrix.astype('float') / confusionMatrix.sum(axis=1)[:, np.newaxis]
+        cm = confusionMatrix.astype('float') / confusionMatrix.sum(axis=1)[:, np.newaxis]
     else:
         cm = confusionMatrix
 
@@ -64,7 +68,7 @@ def plotConfusionMatrix(confusionMatrix,
 
     heatmap = sns.heatmap(cm, ax=ax, annot=True, fmt=".%s%%" % precision, cmap="Greys")
 
-    plt.savefig('./Analysis/' + filepath)
+    plt.savefig(filepath)
 
 
 def plotMetrics(y,

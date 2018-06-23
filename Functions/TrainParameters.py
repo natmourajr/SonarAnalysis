@@ -220,7 +220,7 @@ class TrnParamsConvolutional(object):
                      ["Flatten", {}],
                      ["Dense", {"units": 50}],
                      ["Activation", {"activation": "tanh"}],
-                     ["Dense", {"units": 10}],
+                     ["Dense", {"units": 4}],
                      ["Activation", {"activation": "softmax"}]
                  ],
                  loss=["mean_squared_error"],

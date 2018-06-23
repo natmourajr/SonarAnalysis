@@ -4,11 +4,12 @@
 
     Description: This file contains functions used for Neural Network training.
 """
-
+import csv
 import os
 import pickle
 import warnings
 from abc import abstractmethod
+from warnings import warn
 
 import numpy as np
 import time
@@ -28,6 +29,7 @@ from keras import backend as K, Model
 import multiprocessing
 
 from Functions import TrainParameters as trnparams, SystemIO, DataHandler
+from Functions.DataHandler import lofar2image
 from Functions.TrainParameters import TrnParamsConvolutional
 from Functions.TrainPaths import ConvolutionPaths, ModelPaths
 
@@ -1390,22 +1392,23 @@ class ConvolutionTrainFunction(ConvolutionPaths):
     def loadModels(self, model_list, model_initializer):
         self.models = [model_initializer(model) for model in model_list]
 
-    def loadFolds(self, n_folds):
-        file_name = '%s/%i_folds.jbl' % (self.results_path, n_folds)
+    def loadFolds(self, n_folds, mode):
+        file_name = '%s/%i_folds_%s.jbl' % (self.results_path, n_folds, mode)
         print "Loading fold configuration"
         self.fold_config = SystemIO.load(file_name)
         self.n_folds = n_folds
 
-    def train(self, verbose=(0, 0, 0)):
+    def train(self, image_window, image_stride, fold_mode = 'shuffleRuns', fold_balance = 'class_weights', verbose=(0, 0, 0)):
         # verify data structure
         data, trgt, class_labels = self.dataset
         # Generalize number of classes
         n_classes = len(class_labels)
-
-        categorical_trgt = DataHandler.trgt2categorical(trgt, n_classes)
+        #categorical_trgt = DataHandler.trgt2categorical(trgt, n_classes)
 
         #             if self.scale:
         #                 scaler function
+
+        image_data, _ = lofar2image(data,trgt, class_labels, image_window, image_window, filepath='all_data')
 
         # implement failsafe files
         n_models = len(self.models)
@@ -1414,42 +1417,89 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 print 'Model %i of %i' % (i_model + 1, n_models)
                 #model.pprint()
 
-            status = model.selectFoldConfig(self.n_folds)
+            trained_folds = []
+            status = model.selectFoldConfig(self.n_folds, fold_mode, fold_balance)
             if status is 'Trained':
                 print "Already trained for current fold configuration"
                 continue
             elif status is 'Recovery':
                 print "Resuming Training"
-                # trained_folds = #load recovery file
-                raise NotImplementedError
+                trained_folds = [int(file[0]) for file in os.listdir(model.model_files)]
 
             start = time.time()
             for fold_count, (train_index, test_index) in enumerate(self.fold_config):
-                # if fold_count in trained_folds:
-                #    continue
+                if fold_count in trained_folds:
+                    continue
 
-                x_train, y_train = data[train_index], categorical_trgt[train_index]
-                x_test, y_test = data[test_index], categorical_trgt[test_index]
+                x_train, y_train = data[train_index], trgt[train_index]
+                x_test, y_test = data[test_index], trgt[test_index]
+                #x_train, y_train = data, trgt
+                #x_test, y_test = data, trgt
+
+                warn('Non perm handling of data')
+                x_train, y_train = lofar2image(x_train, y_train, class_labels, image_window, image_stride, filepath='train')
+                x_test, y_test = lofar2image(x_test, y_test, class_labels, image_window, image_window, filepath = 'test')
+
+                class_weights = dict()
+                mass_class = np.inf
+                for cls in class_labels:
+                    if y_train[y_train == cls].shape[0] < mass_class:
+                        mass_class = y_train[y_train == cls].shape[0]
+
+                for cls in class_labels:
+                    class_weights[cls] = float(mass_class)/y_train[y_train == cls].shape[0]
+
+                y_train = DataHandler.trgt2categorical(y_train, n_classes)
+                y_test = DataHandler.trgt2categorical(y_test, n_classes)
+
 
                 if verbose[1]:
                     print "Fold: " + str(fold_count) + '\n'
+                    print "Class Weights:"
+                    for cls in class_labels:
+                        print "\t %s: %i%%" %(cls, 100*class_weights[cls])
+
+                from keras.callbacks import ModelCheckpoint, EarlyStopping
+
+
+
+                bestmodel = ModelCheckpoint(model.model_best + '/%i_fold.h5' % fold_count,
+                                            monitor='val_acc', mode='max', verbose = 1, save_best_only=True)
+
+                stopping = EarlyStopping(monitor = 'val_loss', patience= 10, verbose= 1, mode= 'min')
 
                 model.build()
-                fold_history = model.fit(x_train, y_train, validation_data=(x_test, y_test), verbose=verbose[2])
+                fold_history = model.fit(x_train, y_train, validation_data=(x_test, y_test), callbacks= [bestmodel, stopping],
+                                         class_weight= class_weights , verbose=verbose[2])
 
-                # save model recovery
-                #model.save(model.recovery_file)
-                # save model rec folds
+                model.save(model.model_files + '/%i_fold.h5' % fold_count)
+                model.model = load_model(model.model_best + '/%i_fold.h5' % fold_count)
 
-                fold_predictions = model.predict(data)
-                print len(fold_predictions)
-                print len(fold_history.history)
-                SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.csv' % fold_count)
-                SystemIO.save(fold_predictions, model.model_history + '/' + '%i_fold.csv' % fold_count)
+                fold_predictions = model.predict(x_test)
+                # SystemIO.save(fold_predictions, model.model_predictions + '/' + '%i_fold.jbl' % fold_count)
+                # SystemIO.save(fold_predictions, model.model_history + '/' + '%i_fold.jbl' % fold_count)
 
-                if not 'ModelCheckpoint' in model.callbacks:
-                    warnings.warn('ModelCheckpoint Callback not found for current model.')
-                    model.save(model.model_file)
+                hist_file = model.model_history + '/' + '%i_fold.csv' % fold_count
+                with open(hist_file , 'w') as csvfile:
+                    fieldnames = fold_history.history.keys()
+                    writer = csv.writer(csvfile, delimiter=',')
+                    writer.writerow(fieldnames)
+
+                    for line in np.array(fold_history.history.values()).T:
+                        writer.writerow(line)
+
+                preds_file = model.model_predictions + '/' + '%i_fold.csv' % fold_count
+                with open(preds_file, 'w') as csvfile:
+                    fieldnames = class_labels.values()
+                    writer = csv.writer(csvfile, delimiter=',')
+                    writer.writerow(fieldnames)
+
+                    for line in fold_predictions:
+                        writer.writerow(line)
+
+                # if not 'ModelCheckpoint' in model.callbacks:
+                #     warnings.warn('ModelCheckpoint Callback not found for current model.')
+                #     model.save(model.model_files + '/%i_fold.h5' % fold_count)
 
             # delete model recovery
             # delete model fold recovery
@@ -1544,17 +1594,23 @@ class KerasModel(_CNNModel):
                            metrics=self.metrics
                            )
 
-    def fit(self, x_train, y_train, validation_data=None, class_weight=None, verbose=0):
+    def fit(self, x_train, y_train, callbacks, validation_data=None, class_weight=None, verbose=0):
         if self.model is None:
             raise StandardError('Model is not built. Run build method or load model before fitting')
+
+        print self.epochs
+        print self.batch_size
+        print self.callbacks
+        print class_weight
 
         history = self.model.fit(x_train,
                                  y_train,
                                  epochs=self.epochs,
                                  batch_size=self.batch_size,
-                                 callbacks=self.callbacks.toKerasFn(),
+                                 #callbacks=self.callbacks.toKerasFn(),
+                                 callbacks = callbacks,
                                  validation_data=validation_data,
-                                 class_weight=class_weight,
+                                 #class_weight=class_weight,
                                  verbose=verbose
                                  )
         self.history = history.history

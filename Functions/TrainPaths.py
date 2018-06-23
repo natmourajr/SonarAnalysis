@@ -71,7 +71,8 @@ class ModelPaths(ConvolutionPaths):
 
         self.model_info_file = self.model_path + '/' + 'model_info.jbl'
         self.model_info_file_txt = self.model_path + '/' + 'model_info.txt'
-        self.model_file = None
+        self.model_files = None
+        self.model_best = None
         self.model_history = None
         self.model_predictions = None
         self.model_recovery_state = None
@@ -82,31 +83,37 @@ class ModelPaths(ConvolutionPaths):
 
         return trnParams.getParamPath()
 
-    def selectFoldConfig(self, n_folds):
+    def selectFoldConfig(self, n_folds, mode = 'shuffleRuns', balance = 'class_weights'):
         warn('Implement error handling')
 
-        self.fold_path = self.model_path + '/' + '%i_folds' % n_folds
+        self.fold_path = self.model_path + '/' + '%i_folds_%s' % (n_folds, mode)
 
-        self.model_file = self.fold_path + '/' + 'model_state.h5'
+        #self.model_file = self.fold_path + '/' + 'model_state.h5'
+        self.balance_mode = balance
+        self.model_files = self.fold_path + '/' + 'states'
+        self.model_best = self.fold_path + '/' + 'best_states'
         self.model_history = self.fold_path + '/' + 'history'
         self.model_predictions = self.fold_path + '/' + 'predictions'
         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
 
 
-        print self.model_file
-        if exists(self.model_file):
+        if exists(self.model_files):
+            length_tr = len(os.listdir(self.model_files))
+
+            if length_tr < n_folds:
+                return 'Recovery'
+
             return 'Trained'
         # elif exists(self.model_recovery_state):
         #   return 'Recovery'
         else:
-            self.createFolders(self.fold_path, self.model_history, self.model_predictions)
+            self.createFolders(self.model_files, self.model_best, self.model_history, self.model_predictions)
             return 'Untrained'
 
     def createFolders(self, *args):
         """Creates model folder structure from hyperparameters information"""
         for folder in args:
-            print folder
             mkdir(folder)
 
     def purgeFolder(self, subfolder=''):
