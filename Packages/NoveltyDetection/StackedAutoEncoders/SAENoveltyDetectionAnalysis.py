@@ -36,10 +36,10 @@ num_processes = multiprocessing.cpu_count()
 class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     
     def __init__(self, analysis_name='StackedAutoEncoder', database='4classes', n_pts_fft=1024, decimation_rate=3, spectrum_bins_left=400,
-                 development_flag=False, development_events=400, model_prefix_str='RawData', n_folds=10, verbose=True): 
+                 development_flag=False, development_events=400, model_prefix_str='RawData', n_folds=10, verbose=True, loadData = True): 
         
         super(SAENoveltyDetectionAnalysis, self).__init__(analysis_name, database, n_pts_fft, decimation_rate, spectrum_bins_left, development_flag,
-                                                          development_events, model_prefix_str, verbose)
+                                                          development_events, model_prefix_str, verbose, loadData)
 
         self.analysis_name = analysis_name
         self.trn_params = None
@@ -50,8 +50,29 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         self.development_flag = development_flag
         self.development_events = development_events
     
-    def setTrainParameters(self, n_inits=1, hidden_activation='tanh', output_activation='linear', classifier_output_activation = 'softmax', n_epochs=300,
-                           n_folds=10, patience=30, batch_size=256, verbose=False, optmizerAlgorithm='Adam', metrics=['accuracy'], loss='mean_squared_error'):        
+    def setTrainParameters(self,
+                           n_inits=1,
+                           hidden_activation='tanh',
+                           output_activation='linear',
+                           classifier_output_activation = 'softmax',
+                           n_epochs=300,
+                           n_folds=10,
+                           patience=30,
+                           batch_size=256,
+                           verbose=False,
+                           optmizerAlgorithm='Adam',
+                           metrics=['accuracy'],
+                           loss='mean_squared_error',
+                           norm='mapstd',
+                           train_verbose=False,
+                           learning_rate=0.001,
+                           beta_1 = 0.9,
+                           beta_2 = 0.999,
+                           epsilon = 1e-08,
+                           learning_decay=1e-6,
+                           momentum=0.3,
+                           nesterov=True
+                          ):        
         self.trn_params = TrainParameters.SAENoveltyDetectionTrnParams(n_inits=n_inits,
                                                                        folds=n_folds,
                                                                        hidden_activation=hidden_activation, # others tanh, relu, sigmoid, linear 
@@ -63,7 +84,17 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
                                                                        verbose=verbose,
                                                                        optmizerAlgorithm=optmizerAlgorithm,
                                                                        metrics=metrics, #mean_squared_error
-                                                                       loss=loss) #kullback_leibler_divergence
+                                                                       loss=loss, #kullback_leibler_divergence
+                                                                       norm=norm,
+                                                                       train_verbose=train_verbose,
+                                                                       learning_rate=learning_rate,
+                                                                       beta_1=beta_1,
+                                                                       beta_2=beta_2,
+                                                                       epsilon=epsilon,
+                                                                       learning_decay=learning_decay,
+                                                                       momentum=momentum,
+                                                                       nesterov=nesterov
+                                                                      ) 
         
         self.modelPath = self.trn_params.getModelPath()
         self.baseResultsPath = self.getBaseResultsPath()
@@ -118,7 +149,6 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         if(self.trn_params == None):
             self.loadTrainParameters()
         for inovelty in range(self.trgt_sparse.shape[1]):
-            print "[*] Initializing SAE Class for class %s"%self.getClassLabels()[inovelty]
             self.trn_data[inovelty] = self.all_data[self.all_trgt!=inovelty]
             self.trn_trgt[inovelty] = self.all_trgt[self.all_trgt!=inovelty]
             self.trn_trgt[inovelty][self.trn_trgt[inovelty]>inovelty] = self.trn_trgt[inovelty][self.trn_trgt[inovelty]>inovelty]-1
@@ -134,7 +164,7 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
 
     
     def getSAEModels(self):
-        return [self.SAE, self.trn_data, self.trn_trgt, self.trn_trgt_sparse]
+        return self.SAE
     
     '''
         Method that implements different types of training through interfacing SAE methods

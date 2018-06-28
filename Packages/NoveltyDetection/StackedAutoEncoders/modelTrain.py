@@ -29,14 +29,16 @@ analysis = SAENoveltyDetectionAnalysis(analysis_name="StackedAutoEncoder", verbo
 analysis.loadTrainParameters()
 analysis.createSAEModels()
 
-SAE, trn_data, trn_trgt, trn_trgt_sparse = analysis.getSAEModels()
-
+SAE = analysis.getSAEModels()
+trn_data = analysis.trn_data
+trn_trgt = analysis.trn_trgt
+trn_trgt_sparse = analysis.trn_trgt_sparse
 import multiprocessing
 num_processes = args.threads
 
 inovelty = args.novelty
 
-fineTuning = args.finetunning == 1 if True else False
+fineTuning = args.finetunning
 
 trainingType = args.type
 

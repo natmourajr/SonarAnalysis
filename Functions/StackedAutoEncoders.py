@@ -93,6 +93,8 @@ class StackedAutoEncoders:
             scaler = preprocessing.RobustScaler().fit(data[train_id,:])
         elif self.trn_params.params['norm'] == 'mapminmax':
             scaler = preprocessing.MinMaxScaler().fit(data[train_id,:])
+        else: 
+            return data
         norm_data = scaler.transform(data)
 
         return norm_data

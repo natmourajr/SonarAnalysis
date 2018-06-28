@@ -25,9 +25,7 @@ from Functions import DataHandler as dh
 
 class NoveltyDetectionAnalysis(object):
     def __init__(self, analysis_name='', database='4classes', n_pts_fft=1024, decimation_rate=3, spectrum_bins_left=400,
-                 development_flag=False, development_events=400, model_prefix_str='RawData',verbose = True):
-        
-        m_time = time.time()
+                 development_flag=False, development_events=400, model_prefix_str='RawData',verbose = True, loadData = True):
         
         # Analysis Characteristics
         self.analysis_name = analysis_name
@@ -53,6 +51,11 @@ class NoveltyDetectionAnalysis(object):
         
         self.verbose = verbose
         
+        if(loadData):
+            self.loadData()
+        
+    def loadData(self):
+        m_time = time.time()
         # Check if LofarData has already been created...
         data_file = os.path.join(self.DATA_PATH,self.database,
                                  "lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl"%(self.n_pts_fft,
@@ -100,6 +103,7 @@ class NoveltyDetectionAnalysis(object):
             
             # turn targets in sparse mode
             self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
+            
             
     def balanceData(self):
         # Balance data
