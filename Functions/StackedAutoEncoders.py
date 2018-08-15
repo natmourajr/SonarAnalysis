@@ -24,10 +24,19 @@ from keras import losses
 
 from Functions import TrainParameters as trnparams
 from Functions.MetricsLosses import kullback_leibler_divergence
+from Functions.lossWeights import getGradientWeights
 
 import multiprocessing
 
 num_processes = multiprocessing.cpu_count()
+
+import tensorflow as tf
+from keras.backend import tensorflow_backend as K
+
+#with tf.Session(config=tf.ConfigProto(
+#                    intra_op_parallelism_threads=2)) as sess:
+#    K.set_session(sess)
+
 
 class StackedAutoEncoders:
     def __init__(self, params = None, development_flag = False, n_folds = 2, save_path='', prefix_str='RawData', CVO=None,
@@ -386,7 +395,6 @@ class StackedAutoEncoders:
                                                     patience=self.trn_params.params['patience'],
                                                     verbose=self.trn_params.params['train_verbose'],
                                                     mode='auto')
-
             init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id],
                                       epochs=self.trn_params.params['n_epochs'],
                                       batch_size=self.trn_params.params['batch_size'],
@@ -394,7 +402,8 @@ class StackedAutoEncoders:
                                       verbose=self.trn_params.params['verbose'],
                                       validation_data=(norm_data[test_id],
                                                        norm_data[test_id]),
-                                      shuffle=True)
+                                      shuffle=True
+                                     )
             if np.min(init_trn_desc.history['val_loss']) < best_loss:
                 best_init = i_init
                 best_loss = np.min(init_trn_desc.history['val_loss'])
@@ -440,15 +449,15 @@ class StackedAutoEncoders:
         trgt_sparse = np_utils.to_categorical(trgt.astype(int))
 
         # load model
-        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer]) + 'x' + str(trgt_sparse.shape[1])
+        neurons_str = self.getNeuronsString(data,hidden_neurons[:layer])
 
         if regularizer != None and len(regularizer) != 0:
-            previous_model_str = os.path.join(self.save_path,
+            model_str = os.path.join(self.save_path,
                                               "classifierModel_%i_noveltyID_%s_neurons_%s_regularizer(%.3f)"%(self.inovelty, neurons_str, regularizer, regularizer_param)
                                              )
 
         else:
-            previous_model_str = os.path.join(self.save_path,"classifierModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
+            model_str = os.path.join(self.save_path,"classifierModel_%i_noveltyID_%s_neurons"%(self.inovelty, neurons_str))
 
         classifier = {}
         if not self.development_flag:
@@ -456,14 +465,14 @@ class StackedAutoEncoders:
             try:
                 classifier = load_model(file_name, custom_objects={'%s'%self.trn_params.params['loss']: self.lossFunction})
             except:
-                print '[-] Error: File or Directory not found'
+                print '[-] Error: File or Directory not found. Path: {}'.format(file_name)
                 return
         else:
             file_name  = '%s_fold_%i_model_dev.h5'%(model_str,ifold)
             try:
                 classifier = load_model(file_name, custom_objects={'%s'%self.trn_params.params['loss']: self.lossFunction})
             except:
-                print '[-] Error: File or Directory not found'
+                print '[-] Error: File or Directory not found. Path: {}'.format(file_name)
         return classifier
 
     '''
@@ -583,14 +592,16 @@ class StackedAutoEncoders:
                                                     patience=self.trn_params.params['patience'],
                                                     verbose=self.trn_params.params['train_verbose'],
                                                     mode='auto')
-
+            class_weights = getGradientWeights(trgt[train_id])
             init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
                                       epochs=self.trn_params.params['n_epochs'],
                                       batch_size=self.trn_params.params['batch_size'],
                                       callbacks=[earlyStopping],
                                       verbose=self.trn_params.params['verbose'],
                                       validation_data=(norm_data[test_id], trgt_sparse[test_id]),
-                                      shuffle=True)
+                                      shuffle=True,
+                                      class_weight = class_weights  
+                                     )
             if np.min(init_trn_desc.history['val_loss']) < best_loss:
                 best_init = i_init
                 best_loss = np.min(init_trn_desc.history['val_loss'])

@@ -36,9 +36,9 @@ num_processes = multiprocessing.cpu_count()
 class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     
     def __init__(self, analysis_name='StackedAutoEncoder', database='4classes', n_pts_fft=1024, decimation_rate=3, spectrum_bins_left=400,
-                 development_flag=False, development_events=400, model_prefix_str='RawData', n_folds=10, verbose=True, loadData = True): 
+                 development_flag=False, development_events=400, n_windows=1, model_prefix_str='RawData', n_folds=10, verbose=True, loadData = True): 
         
-        super(SAENoveltyDetectionAnalysis, self).__init__(analysis_name, database, n_pts_fft, decimation_rate, spectrum_bins_left, development_flag,
+        super(SAENoveltyDetectionAnalysis, self).__init__(analysis_name, database, n_pts_fft, decimation_rate, spectrum_bins_left, n_windows, development_flag,
                                                           development_events, model_prefix_str, verbose, loadData)
 
         self.analysis_name = analysis_name
@@ -106,7 +106,7 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             self.trn_params.save(os.path.join(self.RESULTS_PATH,self.analysis_name, "trnparams.jbl"))
         
         # Choose how many fold to be used in Cross Validation
-        self.CVO = TrainParameters.NoveltyDetectionFolds(folder=self.RESULTS_PATH,n_folds=self.n_folds,trgt=self.all_trgt,dev=self.development_flag,
+        self.CVO = TrainParameters.NoveltyDetectionFolds(folder=self.RESULTS_PATH,n_folds=n_folds,trgt=self.all_trgt,dev=self.development_flag,
                                                          verbose=True)
         
     def getBaseResultsPath(self):
@@ -165,6 +165,8 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     
     def getSAEModels(self):
         return self.SAE
+    
+    
     
     '''
         Method that implements different types of training through interfacing SAE methods

@@ -25,7 +25,7 @@ from Functions import DataHandler as dh
 
 class NoveltyDetectionAnalysis(object):
     def __init__(self, analysis_name='', database='4classes', n_pts_fft=1024, decimation_rate=3, spectrum_bins_left=400,
-                 development_flag=False, development_events=400, model_prefix_str='RawData',verbose = True, loadData = True):
+                 n_windows = 1, development_flag=False, development_events=400, model_prefix_str='RawData',verbose = True, loadData = True):
         
         # Analysis Characteristics
         self.analysis_name = analysis_name
@@ -51,8 +51,12 @@ class NoveltyDetectionAnalysis(object):
         
         self.verbose = verbose
         
+        # Set the number of windows to be used per event
+        self.n_windows = n_windows
+        
         if(loadData):
             self.loadData()
+        
         
     def loadData(self):
         m_time = time.time()
@@ -65,19 +69,16 @@ class NoveltyDetectionAnalysis(object):
                                 )
         
         if not os.path.exists(data_file):
-            print 'No Files in %s/%s\n'%(self.DATA_PATH,
-                                         self.database)
+            print 'No Files in %s/%s\n'%(self.DATA_PATH, self.database)
         else:
             #Read lofar data
-            [data,trgt,class_labels] = joblib.load(data_file)
+            [self.all_data,self.all_trgt,class_labels] = joblib.load(data_file)
 
 
             m_time = time.time()-m_time
             print '[+] Time to read data file: '+str(m_time)+' seconds'
 
             # correct format
-            self.all_data = data
-            self.all_trgt = trgt
             self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
 
             # Process data
@@ -90,6 +91,20 @@ class NoveltyDetectionAnalysis(object):
             # Define the class labels with ascii letters in uppercase
             self.class_labels = list(string.ascii_uppercase)[:self.trgt_sparse.shape[1]]
 
+            new_target = np.zeros(0)
+            new_data = np.zeros([0,self.all_data.shape[1]*self.n_windows])
+
+            for iclass, label in enumerate(self.class_labels):
+                data = self.all_data[self.all_trgt==iclass]
+                data = np.reshape(data, [data.shape[0]/self.n_windows, data.shape[1]*self.n_windows])
+                
+                trgt = np.ones(data.shape[0]) * iclass
+                new_data = np.concatenate((new_data, data), axis=0)
+                new_target = np.concatenate((new_target, trgt), axis=0)
+            
+            self.all_data = new_data
+            self.all_trgt = new_target
+            
             for iclass, class_label in enumerate(self.class_labels):
                 if sum(self.all_trgt==iclass) > self.qtd_events_biggest_class:
                     self.qtd_events_biggest_class = sum(self.all_trgt==iclass)
@@ -99,11 +114,13 @@ class NoveltyDetectionAnalysis(object):
             if self.verbose:
                 print "\nBiggest class is %s with %i events"%(self.biggest_class_label,self.qtd_events_biggest_class)
 
-            self.balanceData()
+                        
+                
+            # self.balanceData()
+            
             
             # turn targets in sparse mode
             self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
-            
             
     def balanceData(self):
         # Balance data
