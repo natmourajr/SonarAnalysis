@@ -113,11 +113,9 @@ class NoveltyDetectionAnalysis(object):
                     print "Qtd event of %s is %i"%(class_label,sum(self.all_trgt==iclass))
             if self.verbose:
                 print "\nBiggest class is %s with %i events"%(self.biggest_class_label,self.qtd_events_biggest_class)
-
-                        
-                
+                print "Total of events in the dataset is %i"%(self.all_trgt.shape[0])
+                 
             # self.balanceData()
-            
             
             # turn targets in sparse mode
             self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
