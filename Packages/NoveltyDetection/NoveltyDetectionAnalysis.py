@@ -18,50 +18,53 @@ import json
 import hashlib
 import multiprocessing
 import numpy as np
-
 from sklearn.externals import joblib
-
-import keras.utils
-# from keras.utils import np_utils
-
+from sklearn import model_selection
+from keras.utils import np_utils
 from Functions import TrainParameters
 from Functions import DataHandler as dh
 
-
 class NoveltyDetectionAnalysis(object):
-    def __init__(self, analysis_name='', parameters=None, model_hash=None, load_hash=False, verbose=True, loadData=True):
+    def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=True):
+        
+        self.all_data = None
+        self.all_trgt = None
+        self.all_trgt_sparse = None
+        self.class_labels = None
+        self.verbose = verbose
+        
+        # Enviroment variables
+        self.DATA_PATH = noveltyDetectionConfig.CONFIG['OUTPUTDATAPATH']
+        self.RESULTS_PATH = noveltyDetectionConfig.CONFIG['PACKAGE_NAME']
 
-        if load_hash:
-            self.loadTrainParametersByHash(model_hash)
+        # paths to export results
+        
+        if load_hash and model_hash is not None:
             self.model_hash = model_hash
+            self.baseResultsPath = os.path.join(self.RESULTS_PATH, parameters["Technique"], "outputs", self.model_hash)
+            self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
+            self.loadTrainParametersByHash(model_hash)
         else:
             if (parameters == None):
                 print("Parameters must not be None!")
                 exit()
             self.parameters = parameters
             # Set the hash of the JSON text with the parameters
-            self.model_hash = hashlib.sha256(json.dump(parameters)).hexdigest()
+            self.model_hash = hashlib.sha256(json.dumps(parameters)).hexdigest()
+            self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
+            self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
 
-        self.all_data = None
-        self.all_trgt = None
-        self.all_trgt_sparse = None
-        self.class_labels = None
-
-        # Analysis Characteristics
-        self.analysis_name = analysis_name
-
-        # Enviroment variables
-        self.DATA_PATH = noveltyDetectionConfig.CONFIG['OUTPUTDATAPATH']
-        self.RESULTS_PATH = noveltyDetectionConfig.CONFIG['PACKAGE_NAME']
-
-
-        # paths to export results
-        self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
-
+        
         if not os.path.exists(self.baseResultsPath):
             print ("Creating " + self.baseResultsPath)
             os.makedirs(self.baseResultsPath)
-
+            
+        # Save parameters file
+        if not os.path.exists(self.parameters_file):
+            with open(self.parameters_file, "w") as f:
+                print ("Saving " + self.parameters_file)
+                json.dump(self.parameters, f)
+            
         # Database caracteristics
         self.database = self.parameters['InputDataConfig']['database']
         self.n_pts_fft = int(self.parameters['InputDataConfig']['n_pts_fft'])
@@ -74,12 +77,12 @@ class NoveltyDetectionAnalysis(object):
         self.development_flag = bool(self.parameters['DevelopmentMode'])
         self.development_events = int(self.parameters['DevelopmentEvents'])
 
-        self.verbose = verbose
-
-        if loadData:
+        self.n_folds = self.parameters["HyperParameters"]["n_folds"]
+        
+        if load_data:
             self.loadData()
 
-        self.CVO = None
+        self.CVO = self.getCVO()
 
         # For multiprocessing purpose
         self.num_processes = multiprocessing.cpu_count()
@@ -187,15 +190,38 @@ class NoveltyDetectionAnalysis(object):
         return self.class_labels
 
     def getCVO(self):
-        if (self.CVO == None):
-            # Cross Validation
-            self.CVO = TrainParameters.NoveltyDetectionFolds(folder=self.RESULTS_PATH,
-                                                             n_folds=int(self.parameters['HyperParameters']['n_folds']),
-                                                             trgt=self.all_trgt,
-                                                             dev=bool(self.parameters['HyperParameters']['n_folds']),
-                                                             verbose=self.verbose
-                                                             )
-        return self.CVO
+        # Cross Validation
+        n_folds = self.parameters["HyperParameters"]["n_folds"]
+        if n_folds < 2:
+            print 'Invalid number of folds'
+            return -1
+
+        file_name = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", "%i_folds_cross_validation.jbl"%(n_folds))
+
+        if not os.path.exists(file_name):
+            if self.verbose:
+                print "Creating %s"%(file_name)
+
+            if self.all_trgt is None:
+                print 'Invalid trgt'
+                return -1
+
+            CVO = {}
+            for inovelty, novelty_class in enumerate(np.unique(self.all_trgt)):
+                skf = model_selection.StratifiedKFold(n_splits=n_folds)
+                process_trgt = self.all_trgt[self.all_trgt!=novelty_class]
+                CVO[inovelty] = skf.split(X = np.zeros(process_trgt.shape), y=process_trgt)
+                CVO[inovelty] = list(CVO[inovelty])
+            if self.verbose:
+                print 'Saving in %s'%(file_name)
+
+            joblib.dump([CVO],file_name,compress=9)
+        else:
+            if self.verbose:
+                print "Reading from %s"%(file_name)
+
+            [CVO] = joblib.load(file_name)
+        return CVO
 
     def getBaseResultsPath(self):
         return self.baseResultsPath
@@ -205,6 +231,10 @@ class NoveltyDetectionAnalysis(object):
 
     def loadTrainParametersByHash(self, model_hash):
         # Get JSON text from Database
+        # TODO...
         json_str = ""
-
-        self.parameters = json.loads(json_str)
+        
+        if os.path.exists(self.parameters_file):
+            with open(self.parameters_file, "r") as file:
+                print("Reading from " + self.parameters_file)
+                self.parameters = json.load(file)

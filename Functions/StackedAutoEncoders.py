@@ -35,7 +35,7 @@ num_processes = multiprocessing.cpu_count()
 
 # noinspection PyUnusedLocal
 class StackedAutoEncoders:
-    def __init__(self, parameters=None, save_path='', cvo=None, inovelty=0, verbose=False):
+    def __init__(self, parameters=None, save_path='', CVO=None, inovelty=0, verbose=False):
         self.save_path = save_path
         self.inovelty = inovelty
         self.parameters = parameters
@@ -43,11 +43,11 @@ class StackedAutoEncoders:
 
         # Distinguish between a SAE for Novelty Detection and SAE for just Classification
         if bool(self.parameters["NoveltyDetection"]):
-            self.cvo = cvo[self.inovelty]
+            self.CVO = CVO[self.inovelty]
             self.sae_prefix_str = "sae_model_%i_novelty" % self.inovelty
             self.classifier_prefix_str = "classifier_model_%i_novelty" % self.inovelty
         else:
-            self.cvo = cvo
+            self.CVO = CVO
             self.sae_prefix_str = "sae_model"
             self.classifier_prefix_str = "classifier_model"
 
@@ -84,7 +84,7 @@ class StackedAutoEncoders:
     # Method that preprocess data normalizing it according to "norm" parameter.
     def normalize_data(self, data, ifold):
         # normalize data based in train set
-        train_id, test_id = self.cvo[ifold]
+        train_id, test_id = self.CVO[ifold]
         if self.parameters["HyperParameters"]["norm"] == 'mapstd':
             scaler = preprocessing.StandardScaler().fit(data[train_id, :])
         elif self.parameters["HyperParameters"]["norm"] == 'mapstd_rob':
@@ -156,10 +156,10 @@ class StackedAutoEncoders:
                 if ilayer == 1:
                     model.add(Dense(hidden_neurons[ilayer - 1], input_dim=data.shape[1],
                                     weights=layer_encoder_weights[ilayer], trainable=False))
-                    model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+                    model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
                 else:
                     model.add(Dense(hidden_neurons[ilayer - 1], weights=layer_encoder_weights[ilayer], trainable=False))
-                    model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+                    model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
             # Decoder
             last_decoder_layer = None
             for ilayer in range(layer - 1, 0, -1):
@@ -199,7 +199,7 @@ class StackedAutoEncoders:
             previous_model_str = os.path.join(self.save_path,
                                               self.sae_prefix_str + "_{}_neurons".format(neurons_str))
 
-            file_name = '%s_fold_%i_model_dev.h5' % (previous_model_str, ifold)
+            file_name = '%s_fold_%i_model.h5' % (previous_model_str, ifold)
 
             # Check if the layer was trained
             if not os.path.exists(file_name):
@@ -218,7 +218,7 @@ class StackedAutoEncoders:
             else:
                 model.add(Dense(units=hidden_neurons[ilayer - 1], weights=layer_weights, trainable=True))
 
-            model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+            model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
 
         return model
 
@@ -234,9 +234,6 @@ class StackedAutoEncoders:
             print "[-] Error: The parameter layer must be greater than zero and less " \
                   "or equal to the length of list hidden_neurons"
             return -1
-
-        if self.verbose:
-            print '[+] Using %s as optmizer algorithm' % self.parameters['optmizerAlgorithm']
 
         neurons_str = self.get_neurons_str(data, hidden_neurons[:layer])
 
@@ -254,7 +251,7 @@ class StackedAutoEncoders:
             trn_desc = joblib.load(file_name)
             return ifold, classifier, trn_desc
 
-        train_id, test_id = self.cvo[ifold]
+        train_id, test_id = self.CVO[ifold]
 
         norm_data = self.normalize_data(data, ifold)
 
@@ -277,10 +274,10 @@ class StackedAutoEncoders:
 
                 model.add(Dense(units=hidden_neurons[layer - 1], input_dim=data.shape[1],
                                 kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
-                model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+                model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
                 model.add(Dense(units=data.shape[1], input_dim=hidden_neurons[layer - 1],
                                 kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
-                model.add(Activation(self.parameters["HyperParameters"]["output_activation"]))
+                model.add(Activation(self.parameters["HyperParameters"]["decoder_activation_function"]))
             elif layer > 1:
                 for ilayer in range(1, layer):
                     neurons_str = self.get_neurons_str(data, hidden_neurons[:ilayer])
@@ -309,7 +306,7 @@ class StackedAutoEncoders:
 
                 model.add(Dense(units=hidden_neurons[layer - 1], input_dim=proj_all_data.shape[1],
                                 kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
-                model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+                model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
 
                 if bool(self.parameters["HyperParameters"]["dropout"]):
                     model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
@@ -332,7 +329,7 @@ class StackedAutoEncoders:
                 if bool(self.parameters["HyperParameters"]["dropout"]):
                     model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
 
-                model.add(Activation(self.parameters["HyperParameters"]["output_activation"]))
+                model.add(Activation(self.parameters["HyperParameters"]["decoder_activation_function"]))
 
                 norm_data = proj_all_data
             # end of elif layer > 1:
@@ -441,7 +438,7 @@ class StackedAutoEncoders:
             trn_desc = joblib.load(file_name)
             return ifold, classifier, trn_desc
 
-        train_id, test_id = self.cvo[ifold]
+        train_id, test_id = self.CVO[ifold]
 
         norm_data = self.normalize_data(data, ifold)
 
@@ -469,7 +466,7 @@ class StackedAutoEncoders:
                 previous_model_str = os.path.join(self.save_path,
                                                   self.sae_prefix_str + "_{}_neurons".format(neurons_str))
 
-                file_name = '%s_fold_%i_model_dev.h5' % (previous_model_str, ifold)
+                file_name = '%s_fold_%i_model.h5' % (previous_model_str, ifold)
 
                 # Check if the layer was trained
                 if not os.path.exists(file_name):
@@ -489,12 +486,12 @@ class StackedAutoEncoders:
                     model.add(Dense(units=hidden_neurons[ilayer - 1], weights=layer_weights,
                                     trainable=self.parameters["TechniqueParameters"]["allow_change_weights"]))
 
-                model.add(Activation(self.parameters["HyperParameters"]["hidden_activation"]))
+                model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
 
             # Add Output Layer
             model.add(Dense(units=trgt_sparse.shape[1],
                             kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
-            model.add(Activation(self.parameters["HyperParameters"]["classifier_output_activation"]))
+            model.add(Activation(self.parameters["HyperParameters"]["classifier_output_activation_function"]))
 
             model.compile(loss=self.lossFunction,
                           optimizer=self.optmizer,
