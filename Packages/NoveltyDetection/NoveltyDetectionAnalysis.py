@@ -53,11 +53,21 @@ class NoveltyDetectionAnalysis(object):
             self.model_hash = hashlib.sha256(json.dumps(parameters)).hexdigest()
             self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
             self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
-
+        
+        self.analysis_output_folder = os.path.join(self.baseResultsPath, "AnalysisFiles")
+        self.pictures_output_folder = os.path.join(self.baseResultsPath, "Pictures")
         
         if not os.path.exists(self.baseResultsPath):
             print ("Creating " + self.baseResultsPath)
             os.makedirs(self.baseResultsPath)
+            
+        if not os.path.exists(self.analysis_output_folder):
+            print ("Creating " + self.analysis_output_folder)
+            os.makedirs(self.analysis_output_folder)
+            
+        if not os.path.exists(self.pictures_output_folder):
+            print ("Creating " + self.pictures_output_folder)
+            os.makedirs(self.pictures_output_folder)
             
         # Save parameters file
         if not os.path.exists(self.parameters_file):

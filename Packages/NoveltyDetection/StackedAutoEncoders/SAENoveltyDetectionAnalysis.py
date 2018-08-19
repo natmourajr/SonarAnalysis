@@ -19,6 +19,7 @@ import multiprocessing
 from keras.utils import np_utils
 from sklearn.externals import joblib
 
+from Functions.email_utils import EmailConnection, Email
 from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
