@@ -32,10 +32,8 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=False):
         super(SAENoveltyDetectionAnalysis, self).__init__(parameters=parameters, model_hash=model_hash, load_hash=load_hash, load_data=load_data, verbose=verbose)
         
-
-
-    def createSAEModels(self):        
         self.SAE = {}
+        
         self.trn_data = {}
         self.trn_trgt = {}
         self.trn_trgt_sparse = {}
@@ -45,6 +43,8 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] = self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] - 1
             self.trn_trgt_sparse[inovelty] = np_utils.to_categorical(self.trn_trgt[inovelty].astype(int))
 
+    def createSAEModels(self):        
+        for inovelty in range(self.trgt_sparse.shape[1]):
             # Initialize SAE objects for all novelties
             self.SAE[inovelty] = StackedAutoEncoders(parameters=self.parameters,
                                                      save_path=self.getBaseResultsPath(),
@@ -67,7 +67,7 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             for ineuron in hidden_neurons[1:]:
                 hiddenNeuronsStr = hiddenNeuronsStr + 'x' + str(ineuron)
 
-        sysCall = "python modelTrain.py --layer {0} --novelty {1} --finetunning {2} --threads {3} --type {4} --hiddenNeurons {5} --neuronsVariationStep {6} --modelhash {7}".format(
+        sysCall = "python sae_train.py --layer {0} --novelty {1} --finetunning {2} --threads {3} --type {4} --hiddenNeurons {5} --neuronsVariationStep {6} --modelhash {7}".format(
             layer, inovelty, fineTuning, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
         print sysCall
         os.system(sysCall)
