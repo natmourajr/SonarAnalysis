@@ -25,7 +25,8 @@ class _Path(object):
 class ConvolutionPaths(_Path):
     """Class with references to all sub-folders(models and results)
     required for the convolution models training and analysis"""
-    results_path = './Analysis'
+    #results_path = './Analysis'
+    results_path = os.getenv('PACKAGE_NAME')
 
     def __init__(self):
         super(ConvolutionPaths, self).__init__()
@@ -79,37 +80,45 @@ class ModelPaths(ConvolutionPaths):
         self.model_recovery_folds = None
 
     def genPathStr(self, trnParams):
-        warn('Test path implemented')
+        # TODO implement definitive path
 
         return trnParams.getParamPath()
 
-    def selectFoldConfig(self, n_folds, mode = 'shuffleRuns', balance = 'class_weights'):
+    def selectFoldConfig(self, n_folds, mode='shuffleRuns', balance='class_weights'):
         warn('Implement error handling')
 
-        self.fold_path = self.model_path + '/' + '%i_folds_%s' % (n_folds, mode)
+        self.fold_path = self.model_path + '/' + '%s' % mode
 
         #self.model_file = self.fold_path + '/' + 'model_state.h5'
         self.balance_mode = balance
         self.model_files = self.fold_path + '/' + 'states'
         self.model_best = self.fold_path + '/' + 'best_states'
         self.model_history = self.fold_path + '/' + 'history'
+        self.model_recovery_history = self.fold_path + '/' + 'history/~history.npy'
+
         self.model_predictions = self.fold_path + '/' + 'predictions'
+        self.model_recovery_predictions = self.fold_path + '/' + 'predictions/~predictions.npy'
+
         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
 
 
         if exists(self.model_files):
             length_tr = len(os.listdir(self.model_files))
+            if length_tr < n_folds and length_tr > 0:
+                self.status = 'Recovery'
 
-            if length_tr < n_folds:
-                return 'Recovery'
-
-            return 'Trained'
+            elif length_tr == n_folds:
+                self.status = 'Trained'
+            else:
+                self.status = 'Untrained'
         # elif exists(self.model_recovery_state):
         #   return 'Recovery'
         else:
             self.createFolders(self.model_files, self.model_best, self.model_history, self.model_predictions)
-            return 'Untrained'
+            self.status = 'Untrained'
+
+        self.trained_folds_files = os.listdir(self.model_files)
 
     def createFolders(self, *args):
         """Creates model folder structure from hyperparameters information"""

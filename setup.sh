@@ -29,7 +29,23 @@ elif [[ "$USER" == "vinicius.mello" ]]; then
         export SONAR_WORKSPACE=/home/vinicius.mello/Workspace/SonarAnalysis
         export INPUTDATAPATH=/home/vinicius.mello/Public/Marinha/Data
     fi
-fi    
+
+elif [[ "$USER" == "pedro.lisboa" ]]; then
+    # pedro.lisboa user
+    if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
+        # Ubuntu
+        export SONAR_WORKSPACE=/home/pedrolisboa/Workspace/lps/SonarAnalysis
+        export INPUTDATAPATH=/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification 
+    fi
+elif [[ "$USER" == "pedrolisboa" ]]; then
+    # pedro.lisboa user
+    if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
+        # Ubuntu
+        export SONAR_WORKSPACE=/home/pedrolisboa/Workspace/lps/SonarAnalysis
+        export INPUTDATAPATH=/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification 
+    fi
+fi
+
 export OUTPUTDATAPATH=$SONAR_WORKSPACE/Results
 export PYTHONPATH=$SONAR_WORKSPACE:$PYTHONPATH
 

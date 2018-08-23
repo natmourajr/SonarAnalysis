@@ -5,12 +5,17 @@
 import os
 import keras
 import numpy as np
+import keras.backend as K
 
 from collections import OrderedDict
 from warnings import warn
+
+from keras.utils import get_custom_objects
 from sklearn.externals import joblib
 from sklearn import model_selection
-from Functions.SystemIO import load, exists
+
+from Functions.Scores import spIndex, recall_score, ind_SP
+from Functions.SystemIO import load, exists, mkdir
 
 
 class TrnParams(object):
@@ -199,13 +204,25 @@ class SAENoveltyDetectionTrnParams(NeuralClassificationTrnParams):
 class TrnParamsConvolutional(object):
     def __init__(self,
                  prefix="convnet",
-                 optimizer=["SGD", {'lr': 0.01,
+                 optimizer= None,
+                 layers= None,
+                 loss=None,
+                 metrics=None,
+                 epochs=10,
+                 batch_size=32,
+                 callbacks=[],
+                 scale=False,
+                 input_shape=(28, 28, 1)
+                 ):
+
+        # Default parameter settings -------------------------------
+        if optimizer is None:
+            optimizer = ["SGD", {'lr': 0.01,
                                     'decay': 1e-6,
                                     'momentum': 0.9,
-                                    'nesterov': True}
-                            ],
-                 layers=[
-                     ["Conv2D", {"filters": 6,
+                                    'nesterov': True}]
+        if layers is None:
+            layers = [["Conv2D", {"filters": 6,
                                  "kernel_size": (4, 4),
                                  "strides": 1,
                                  "data_format": "channels_last",
@@ -221,41 +238,26 @@ class TrnParamsConvolutional(object):
                      ["Dense", {"units": 50}],
                      ["Activation", {"activation": "tanh"}],
                      ["Dense", {"units": 4}],
-                     ["Activation", {"activation": "softmax"}]
-                 ],
-                 loss=["mean_squared_error"],
-                 metrics=['acc'],
-                 n_epochs=10,
-                 batch_size=32,
-                 callbacks=[],
-                 scale=False,
-                 input_shape=(28, 28, 1)
-                 ):
+                     ["Activation", {"activation": "softmax"}]]
+        if loss is None:
+            loss = "mean_squared_error"
+
+        if metrics is None:
+            metrics = ['acc', ind_SP]
+
+        get_custom_objects().update({"ind_SP": ind_SP})
 
         # Place input shape on first layer parameter list
         layers[0][1]['input_shape'] = input_shape
 
+        # Setting parameters --------------------------------------
         self.__dict__ = OrderedDict()
         self.__dict__['prefix'] = prefix
-        if isinstance(optimizer, Optimizer) or optimizer is None:
-            self.__dict__['optimizer'] = optimizer
-        elif isinstance(optimizer, list):
-            self.__dict__['optimizer'] = Optimizer(optimizer[0], **optimizer[1])
-        else:
-            raise ValueError('optimizer must be an instance of Optimizer or list'
-                             '%s of type %s was passed' % (optimizer, type(optimizer)))
-
-        if isinstance(layers, Layers) or layers is None:
-            self.__dict__['layers'] = layers
-        elif isinstance(layers, list):
-            self.__dict__['layers'] = Layers(layers)
-        else:
-            raise ValueError('layers must be an instance of Layers or list'
-                             '%s of type %s was passed' % (optimizer, type(optimizer)))
-
-        self.__dict__['loss'] = loss
+        self.list2Optimizer(optimizer)
+        self.list2layers(layers)
+        self.__dict__['loss'] = loss[0] if isinstance(loss, list) else loss
         self.__dict__['metrics'] = metrics
-        self.__dict__['epochs'] = n_epochs
+        self.__dict__['epochs'] = epochs
         self.__dict__['batch_size'] = batch_size
         self.__dict__['scale'] = scale
 
@@ -266,6 +268,50 @@ class TrnParamsConvolutional(object):
         else:
             raise ValueError('layers must be an instance of Layers or list'
                              '%s of type %s was passed' % (callbacks, type(callbacks)))
+
+    @property
+    def inputShape(self):
+        return self.layers[0].parameters['input_shape']
+
+    def toJson(self):
+        return {key: value if not (isinstance(value, Parameter) or isinstance(value, _ParameterSet))
+        else value.toJson() for key, value in self}
+
+
+    def changeLayer(self, layer_name, new_layer):
+        #TODO implement error checking
+
+        for i,layer in enumerate(self.layers):
+            if layer.identifier == layer_name:
+                self.layers[i] = new_layer
+
+    def changeLayerParams(self, layer_name, param_name, new_value):
+        # TODO implement error checking
+
+        for i,layer in enumerate(self.layers):
+            if layer.identifier == layer_name:
+                for parameter_key in layer.parameters:
+                    if parameter_key == param_name:
+
+                        self.layers[i].parameters[param_name] = new_value
+
+    def list2Optimizer(self, optimizer):
+        if isinstance(optimizer, Optimizer) or optimizer is None:
+            self.__dict__['optimizer'] = optimizer
+        elif isinstance(optimizer, list):
+            self.__dict__['optimizer'] = Optimizer(optimizer[0], **optimizer[1])
+        else:
+            raise ValueError('optimizer must be an instance of Optimizer or list'
+                             '%s of type %s was passed' % (optimizer, type(optimizer)))
+
+    def list2layers(self, layers):
+        if isinstance(layers, Layers) or layers is None:
+            self.__dict__['layers'] = layers
+        elif isinstance(layers, list):
+            self.__dict__['layers'] = Layers(layers)
+        else:
+            raise ValueError('layers must be an instance of Layers or list'
+                             '%s of type %s was passed' % (optimizer, type(optimizer)))
 
     @classmethod
     def fromfile(cls, filepath):
@@ -290,20 +336,19 @@ class TrnParamsConvolutional(object):
         raise StopIteration
 
     def getParamPath(self):
-        warn('Test implementation')
-
-        path = self.prefix + '/' + self.optimizer.identifier + '/'
+        path = self.prefix + '/' + self.optimizer.getPathStr() + '/'
         for layer in self.layers:
             if layer.identifier == 'Activation':
                 path = path + layer.parameters['activation'] + '_'
             else:
                 path = path + layer.identifier + '_'
-        path = path + '/'
+        path = path[:-1] + '/'  # remove last '_'
         for layer in self.layers:
             path = path + layer.getPathStr()
-        path = path + '/' + self.loss[0]
+        path = path[:-1] + '/' + self.loss
         for metric in self.metrics:
-            path = path + '_' + metric
+            str_metric = metric if isinstance(metric, str) else metric.__name__
+            path = path + '_' + str_metric
         path = path + '_' + str(self.epochs)
         path = path + '_' + str(self.batch_size)
         path = path + '_' + str(self.scale)
@@ -362,6 +407,10 @@ class Parameter(object):
             yield (param, self.__dict__[param])
         raise StopIteration
 
+    def toJson(self):
+        return {'identifier': self.identifier,
+                'parameters': self.parameters}
+
     def pprint(self):
         raise NotImplementedError
 
@@ -415,6 +464,9 @@ class _ParameterSet(object):
             yield element
         raise StopIteration
 
+    def toJson(self):
+        return {i:element.toJson() for i,element in enumerate(self.elements)}
+
     def pprint(self):
         raise NotImplementedError
 
@@ -447,10 +499,13 @@ class Optimizer(Parameter):
     def toKerasFn(self):
         return super(Optimizer, self).toKerasFn(keras.optimizers, self.identifier, self.parameters)
 
+    def getPathStr(self):
+        return self.identifier
+
 
 class Layer(Parameter):
-    type_list = ['Conv2D', 'Conv1D', 'MaxPooling2D', 'MaxPooling1D', 'Flatten', 'Dense', 'Activation']
-    type2path = ['c2', 'c1', 'mp1', 'mp2', '', 'd', '']
+    type_list = ['Conv2D', 'Conv1D', 'MaxPooling2D', 'MaxPooling1D', 'AveragePooling1D', 'AveragePooling2D', 'Flatten', 'Dense', 'Activation', 'Dropout']
+    type2path = ['c2', 'c1', 'mp2', 'mp1', 'ap1', 'ap2', '', 'd', '', 'drop']
 
     def __init__(self, layer_type, **kwargs):
 
@@ -473,7 +528,7 @@ class Layer(Parameter):
                 param_str = param_str + parameter[0] + '_'
                 for element in self.parameters[parameter]:
                     param_str = param_str + str(element) + '_'
-                param_str = param_str + '_'
+                param_str = param_str #+ '_'
             else:
                 param_str = param_str + parameter[0] + '_' + str(self.parameters[parameter]) + '_'
 
@@ -481,7 +536,7 @@ class Layer(Parameter):
 
 
 class Callback(Parameter):
-    type_list = []
+    type_list = ['ModelCheckpoint', 'EarlyStopping', 'ReduceLROnPlateau', 'CSVLogger', ]
 
     def __init__(self, callback, **kwargs):
         if not callback in self.type_list:
@@ -584,54 +639,54 @@ class ConvolutionPaths(_Path):
                 yield model_path
 
 
-class ModelPaths(ConvolutionPaths):
-    def __init__(self, trnParams):
-        if not isinstance(trnParams, TrnParamsConvolutional):
-            raise ValueError('The parameters inserted must be an instance of TrnPararamsConvolutional'
-                             '%s of type %s was passed.'
-                             % (trnParams, type(trnParams)))
-
-        self.model_path = self.results_path + '/' + self.genPathStr(trnParams)
-        # self.model_data = "%s_%s_%s_%s"%(now.year,now.month,now.day,now.hour)
-
-        self.model_info_file = self.model_path + '/' + 'model_info.jbl'
-        self.model_info_file_txt = self.model_path + '/' + 'model_info.txt'
-        self.model_file = None
-        self.model_history = None
-        self.model_predictions = None
-        self.model_recovery_state = None
-        self.model_recovery_folds = None
-
-    def genPathStr(self, trnParams):
-        warn('Test path implemented')
-
-        return trnParams.getParamPath()
-
-    def selectFoldConfig(self, n_folds):
-        warn('Implement error handling')
-
-        self.fold_path = self.model_path + '/' + '%i_folds' % n_folds
-
-        self.model_file = self.fold_path + '/' + 'model_state.h5'
-        self.model_history = self.fold_path + '/' + 'history.csv'
-        self.model_predictions = self.fold_path + '/' + 'predictions'
-        self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
-        self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
-
-        if exists(self.model_file):
-            return 'Trained'
-        # elif exists(self.model_recovery_state):
-        #   return 'Recovery'
-        else:
-            self.createFolders(self.model_path)
-            return 'Untrained'
-
-    @staticmethod
-    def createFolders(*args):
-        """Creates model folder structure from hyperparameters information"""
-        for folder in args:
-            print folder
-            mkdir(folder)
-
-    def purgeFolder(self, subfolder=''):
-        raise NotImplementedError
+# class ModelPaths(ConvolutionPaths):
+#     def __init__(self, trnParams):
+#         if not isinstance(trnParams, TrnParamsConvolutional):
+#             raise ValueError('The parameters inserted must be an instance of TrnPararamsConvolutional'
+#                              '%s of type %s was passed.'
+#                              % (trnParams, type(trnParams)))
+#
+#         self.model_path = self.results_path + '/' + self.genPathStr(trnParams)
+#         # self.model_data = "%s_%s_%s_%s"%(now.year,now.month,now.day,now.hour)
+#
+#         self.model_info_file = self.model_path + '/' + 'model_info.jbl'
+#         self.model_info_file_txt = self.model_path + '/' + 'model_info.txt'
+#         self.model_file = None
+#         self.model_history = None
+#         self.model_predictions = None
+#         self.model_recovery_state = None
+#         self.model_recovery_folds = None
+#
+#     def genPathStr(self, trnParams):
+#         warn('Test path implemented')
+#
+#         return trnParams.getParamPath()
+#
+#     def selectFoldConfig(self, n_folds):
+#         warn('Implement error handling')
+#
+#         self.fold_path = self.model_path + '/' + '%i_folds' % n_folds
+#
+#         self.model_file = self.fold_path + '/' + 'model_state.h5'
+#         self.model_history = self.fold_path + '/' + 'history.csv'
+#         self.model_predictions = self.fold_path + '/' + 'predictions'
+#         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
+#         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
+#
+#         if exists(self.model_file):
+#             return 'Trained'
+#         # elif exists(self.model_recovery_state):
+#         #   return 'Recovery'
+#         else:
+#             self.createFolders(self.model_path)
+#             return 'Untrained'
+#
+#     @staticmethod
+#     def createFolders(*args):
+#         """Creates model folder structure from hyperparameters information"""
+#         for folder in args:
+#             print folder
+#             mkdir(folder)
+#
+#     def purgeFolder(self, subfolder=''):
+#         raise NotImplementedError

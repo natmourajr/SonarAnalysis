@@ -69,6 +69,9 @@ def plotConfusionMatrix(confusionMatrix,
     heatmap = sns.heatmap(cm, ax=ax, annot=True, fmt=".%s%%" % precision, cmap="Greys")
 
     plt.savefig(filepath)
+    plt.close()
+    return plt
+
 
 
 def plotMetrics(y,
@@ -106,27 +109,36 @@ def plotMetrics(y,
     raise NotImplementedError
 
 
-def plotLOFARgram(image,filename = None):
+def plotLOFARgram(image,ax = None, filename = None):
     """Plot LOFARgram from an array of frequency spectre values
 
     Args:
     image (numpy.array): Numpy array with the frequency spectres along the second axis
     """
+    if ax is None:
+        fig = plt.figure(figsize=(20, 20))
+        plt.rcParams['font.weight'] = 'bold'
+        plt.rcParams['font.size'] = 30
+        plt.rcParams['xtick.labelsize'] = 30
+        plt.rcParams['ytick.labelsize'] = 30
 
-    fig = plt.subplots(figsize=(20, 20))
-    plt.rcParams['font.weight'] = 'bold'
-    plt.rcParams['font.size'] = 30
-    plt.rcParams['xtick.labelsize'] = 30
-    plt.rcParams['ytick.labelsize'] = 30
+        plt.imshow(image,
+                   cmap="jet", extent=[1, image.shape[1], image.shape[0], 1],
+                   aspect="auto")
 
-    plt.imshow(image,
-               cmap="jet", extent=[1, 400, image.shape[0], 1],
-               aspect="auto")
+        plt.xlabel('Frequency bins', fontweight='bold')
+        plt.ylabel('Time (seconds)', fontweight='bold')
 
-    plt.xlabel('Frequency bins', fontweight='bold')
-    plt.ylabel('Time (seconds)', fontweight='bold')
+        if not filename is None:
+            plt.savefig(filename)
+            plt.close()
+            return
 
-    if not filename is None:
-        plt.savefig(filename)
+        return fig
+    else:
+        x = ax.imshow(image,
+                   cmap="jet", extent=[1, 400, image.shape[0], 1],
+                   aspect="auto")
+        plt.colorbar(x, ax = ax)
+        return
 
-    return plt

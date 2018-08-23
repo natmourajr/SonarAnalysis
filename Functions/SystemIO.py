@@ -36,6 +36,8 @@ def filterPaths(folder_list):
         if folder[0] != '.':
             yield folder
 
-
 def listfolders(datapath):
+    return [folder for folder in os.listdir(datapath) if os.path.isdir(datapath + '/' + folder)]
+
+def listfiles(datapath):
     return filterPaths(os.listdir(datapath))
