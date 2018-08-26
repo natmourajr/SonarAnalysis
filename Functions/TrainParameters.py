@@ -5,7 +5,6 @@
 import os
 import keras
 import numpy as np
-import keras.backend as K
 
 from collections import OrderedDict
 from warnings import warn
@@ -14,20 +13,21 @@ from keras.utils import get_custom_objects
 from sklearn.externals import joblib
 from sklearn import model_selection
 
-from Functions.Scores import spIndex, recall_score, ind_SP
-from Functions.SystemIO import load, exists, mkdir
+from Functions.TfUtils.Scores import spIndex
+from Functions.SystemIO import load
 
 
 class TrnParams(object):
     """
         Basic class
     """
+
     def __init__(self, analysis="None"):
         self.analysis = analysis
         self.params = None
 
     def save(self, name="None"):
-        joblib.dump([self.params],name,compress=9)
+        joblib.dump([self.params], name, compress=9)
 
     def load(self, name="None"):
         [self.params] = joblib.load(name)
@@ -40,19 +40,18 @@ class TrnParams(object):
 # classification
 
 def ClassificationFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False):
-
     if n_folds < 2:
         print 'Invalid number of folds'
         return -1
 
     if not dev:
-        file_name = '%s/%i_folds_cross_validation.jbl'%(folder,n_folds)
+        file_name = '%s/%i_folds_cross_validation.jbl' % (folder, n_folds)
     else:
-        file_name = '%s/%i_folds_cross_validation_dev.jbl'%(folder,n_folds)
+        file_name = '%s/%i_folds_cross_validation_dev.jbl' % (folder, n_folds)
 
     if not os.path.exists(file_name):
         if verbose:
-            print "Creating %s"%(file_name)
+            print "Creating %s" % (file_name)
 
         if trgt is None:
             print 'Invalid trgt'
@@ -60,13 +59,14 @@ def ClassificationFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False):
 
         CVO = model_selection.StratifiedKFold(trgt, n_folds)
         CVO = list(CVO)
-        joblib.dump([CVO],file_name,compress=9)
+        joblib.dump([CVO], file_name, compress=9)
     else:
         if verbose:
-            print "File %s exists"%(file_name)
+            print "File %s exists" % (file_name)
         [CVO] = joblib.load(file_name)
 
     return CVO
+
 
 class NeuralClassificationTrnParams(TrnParams):
     """
@@ -80,9 +80,9 @@ class NeuralClassificationTrnParams(TrnParams):
                  train_verbose=False,
                  n_epochs=10,
                  learning_rate=0.001,
-                 beta_1 = 0.9,
-                 beta_2 = 0.999,
-                 epsilon = 1e-08,
+                 beta_1=0.9,
+                 beta_2=0.999,
+                 epsilon=1e-08,
                  learning_decay=1e-6,
                  momentum=0.3,
                  nesterov=True,
@@ -93,7 +93,7 @@ class NeuralClassificationTrnParams(TrnParams):
                  metrics=['accuracy'],
                  loss='mean_squared_error',
                  optmizerAlgorithm='SGD'
-                ):
+                 ):
         self.params = {}
 
         self.params['n_inits'] = n_inits
@@ -119,14 +119,15 @@ class NeuralClassificationTrnParams(TrnParams):
         self.params['optmizerAlgorithm'] = optmizerAlgorithm
 
     def get_params_str(self):
-        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation'%
-                     (self.params['n_inits'],self.params['norm'],self.params['n_epochs'],self.params['batch_size'],
-                      self.params['hidden_activation'],self.params['output_activation']))
+        param_str = ('%i_inits_%s_norm_%i_epochs_%i_batch_size_%s_hidden_activation_%s_output_activation' %
+                     (self.params['n_inits'], self.params['norm'], self.params['n_epochs'], self.params['batch_size'],
+                      self.params['hidden_activation'], self.params['output_activation']))
         for imetric in self.params['metrics']:
             param_str = param_str + '_' + imetric
-      
+
         param_str = param_str + '_metric_' + self.params['loss'] + '_loss'
         return param_str
+
 
 # novelty detection
 
@@ -136,36 +137,37 @@ def NoveltyDetectionFolds(folder, n_folds=2, trgt=None, dev=False, verbose=False
         return -1
 
     if not dev:
-        file_name = '%s/%i_folds_cross_validation.jbl'%(folder,n_folds)
+        file_name = '%s/%i_folds_cross_validation.jbl' % (folder, n_folds)
     else:
-        file_name = '%s/%i_folds_cross_validation_dev.jbl'%(folder,n_folds)
+        file_name = '%s/%i_folds_cross_validation_dev.jbl' % (folder, n_folds)
 
     if not os.path.exists(file_name):
         if verbose:
-            print "Creating %s"%(file_name)
+            print "Creating %s" % (file_name)
 
         if trgt is None:
             print 'Invalid trgt'
             return -1
 
         CVO = {}
-        for inovelty,novelty_class in enumerate(np.unique(trgt)):
+        for inovelty, novelty_class in enumerate(np.unique(trgt)):
             skf = model_selection.StratifiedKFold(n_splits=n_folds)
-            process_trgt = trgt[trgt!=novelty_class]
-            CVO[inovelty] = skf.split(X = np.zeros(process_trgt.shape), y=process_trgt)
+            process_trgt = trgt[trgt != novelty_class]
+            CVO[inovelty] = skf.split(X=np.zeros(process_trgt.shape), y=process_trgt)
             CVO[inovelty] = list(CVO[inovelty])
         if verbose:
-            print 'Saving in %s'%(file_name)
+            print 'Saving in %s' % (file_name)
 
-        joblib.dump([CVO],file_name,compress=9)
+        joblib.dump([CVO], file_name, compress=9)
 
     else:
         if verbose:
-            print "Reading from %s"%(file_name)
+            print "Reading from %s" % (file_name)
 
         [CVO] = joblib.load(file_name)
 
     return CVO
+
 
 class SVMNoveltyDetectionTrnParams(TrnParams):
     """
@@ -185,21 +187,22 @@ class SVMNoveltyDetectionTrnParams(TrnParams):
         self.params['kernel'] = kernel
 
     def get_params_str(self):
-        gamma_str = ('%1.5f'%(self.params['gamma'])).replace('.','_')
-        param_str = ('%s_norm_%s_gamma_%s_kernel'%
-                     (self.params['norm'],gamma_str,self.params['kernel']))
+        gamma_str = ('%1.5f' % (self.params['gamma'])).replace('.', '_')
+        param_str = ('%s_norm_%s_gamma_%s_kernel' %
+                     (self.params['norm'], gamma_str, self.params['kernel']))
         return param_str
+
 
 class NNNoveltyDetectionTrnParams(NeuralClassificationTrnParams):
     """
         NN Novelty Detection TrnParams
     """
 
+
 class SAENoveltyDetectionTrnParams(NeuralClassificationTrnParams):
     """
         SAE Novelty Detection TrnParams
     """
-
 
 class TrnParamsConvolutional(object):
     def __init__(self,
@@ -243,9 +246,9 @@ class TrnParamsConvolutional(object):
             loss = "mean_squared_error"
 
         if metrics is None:
-            metrics = ['acc', ind_SP]
+            metrics = ['acc', spIndex]
 
-        get_custom_objects().update({"ind_SP": ind_SP})
+        get_custom_objects().update({"spIndex": spIndex})
 
         # Place input shape on first layer parameter list
         layers[0][1]['input_shape'] = input_shape
@@ -311,7 +314,7 @@ class TrnParamsConvolutional(object):
             self.__dict__['layers'] = Layers(layers)
         else:
             raise ValueError('layers must be an instance of Layers or list'
-                             '%s of type %s was passed' % (optimizer, type(optimizer)))
+                             '%s of type %s was passed' % (layers, type(layers)))
 
     @classmethod
     def fromfile(cls, filepath):

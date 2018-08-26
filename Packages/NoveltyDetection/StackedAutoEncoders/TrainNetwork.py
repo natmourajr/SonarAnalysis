@@ -83,7 +83,7 @@ else:
     balanced_data = {}
     balanced_trgt = {}
 
-    from Functions import DataHandler as dh
+    from Functions import CrossValidation as dh
     m_datahandler = dh.DataHandlerFunctions()
 
     for iclass, class_label in enumerate(class_labels):
