@@ -17,6 +17,7 @@ from sklearn.model_selection._split import BaseCrossValidator
 from sklearn.utils import shuffle
 
 from Functions import SystemIO
+from Functions.NpUtils.DataTransformation import SonarRunsInfo
 from Functions.SystemIO import listfiles, load, save, listfolders
 
 
@@ -65,36 +66,12 @@ class NestedCV:
 class SonarRunsCV(BaseCrossValidator):
     def __init__(self, n_splits, inputdatapath, verbose = False):
         super(SonarRunsCV, self).__init__()
+
+        runs_info = SonarRunsInfo(inputdatapath, verbose)
         self.inputdatapath = inputdatapath
         self.n_splits = n_splits
-        self.runs = OrderedDict()
-        self.runs_named = OrderedDict()
-        self.verbose = verbose
-
-        # Load runs from folders
-        class_offset = 0
-        self.class_folders = list(listfolders(self.inputdatapath))
-        for class_folder in self.class_folders:
-            run_files = listfiles(self.inputdatapath + '/' + class_folder)
-            run_files = list(run_files)
-            run_names = map(lambda x: str(x[:-4]), run_files) # remove .wav file extension
-            run_paths = map(lambda x: self.inputdatapath + '/' + class_folder + '/' + x, run_files)
-            run_names.sort()
-            run_paths.sort()
-            run_indices = list(self._iterClassIndices(run_paths, class_offset, 1024))
-            if self.verbose:
-                offsets = list(map(lambda x: x[0], run_indices))
-                lengths = list(map(len, run_indices))
-                print class_folder
-                print "\tLength\tOffset"
-                for (i, length), offset in zip(enumerate(lengths), offsets):
-                    print "Run %i:\t%i\t%i" % (i, length, offset)
-                print "Total: \t%i\n" % (sum(lengths))
-
-            class_offset = class_offset + sum(map(len, run_indices))
-
-            self.runs[class_folder] = run_indices
-            self.runs_named[class_folder] = {filename: indices for filename, indices in zip(run_names, run_indices)}
+        self.runs = runs_info.runs
+        self.runs_named = runs_info.runs_named
 
     def _iter_test_indices(self, X=None, y=None, groups=None, dev=False):
         run_cyclers = {cls: cycle(shuffle(self.runs[cls])) for cls in self.class_folders}
@@ -114,20 +91,5 @@ class SonarRunsCV(BaseCrossValidator):
             test_indices = np.fromiter(getClsRuns(self.class_folders), dtype=int)
             yield test_indices
 
-
-    def _iterClassIndices(self, runpaths, class_offset, window):
-        run_offset = 0
-        for run in runpaths:
-            run_indices = self._getRunIndices(run, class_offset + run_offset, window)
-            run_offset += len(run_indices)
-            yield run_indices
-
-    def _getRunIndices(self, runfile, offset, window):
-        with contextlib.closing(wave.open(runfile, 'r')) as runfile:
-            frames = runfile.getnframes()
-            end_frame = frames / window + offset
-
-        return range(offset, end_frame)
-
     def get_n_splits(self, X=None, y=None, groups=None):
-        raise NotImplementedError
+        return self.n_splits

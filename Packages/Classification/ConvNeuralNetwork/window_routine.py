@@ -6,7 +6,7 @@ from Functions.ConvolutionalNeuralNetworks import KerasModel
 from Functions.TrainParameters import TrnParamsConvolutional
 import os
 from Functions.CrossValidation import NestedCV, SonarRunsCV
-from Functions.NpUtils.DataTransformation import lofar2image
+from Functions.NpUtils.DataTransformation import lofar2image, SonarRunsInfo
 from Functions.SystemIO import exists, mkdir
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -74,7 +74,7 @@ for cv_name, cv in ncv.cv.items():
                                            ],
                                            loss="categorical_crossentropy")
 
-        cv_info = SonarRunsCV(10, audiodatapath + '/' + database)
+        run_info = SonarRunsInfo(audiodatapath + '/' + database)
 
         def transform_fn(all_data, all_trgt, index_info, info):
             if info == 'train':
@@ -84,10 +84,9 @@ for cv_name, cv in ncv.cv.items():
             return lofar2image(all_data=all_data,
                                all_trgt=all_trgt,
                                index_info=index_info,
-                               class_labels=class_labels,
-                               class_window=image_window,
+                               window_size=image_window,
                                stride=stride,
-                               run_split_info=cv_info)
+                               run_indices_info=run_info)
 
         cvt = ConvolutionTrainFunction()
         cvt.loadModels([trnparams], KerasModel)
