@@ -70,7 +70,6 @@ for cv_name, cv in ncv.cv.items():
                                                ["Activation", {"activation": "softmax"}]
                                            ],
                                            loss="categorical_crossentropy")
-
         run_info = SonarRunsInfo(audiodatapath + '/' + database)
 
         def transform_fn(all_data, all_trgt, index_info, info):

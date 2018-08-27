@@ -25,6 +25,7 @@ class SonarRunsInfo():
         # Load runs from folders
         class_offset = 0
         self.class_folders = list(listfolders(self.inputdatapath))
+        self.class_folders.sort()
         for class_folder in self.class_folders:
             run_files = listfiles(self.inputdatapath + '/' + class_folder)
             run_files = list(run_files)

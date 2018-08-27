@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 # SonarAnalysis Setup Script
 #
@@ -34,15 +34,15 @@ elif [[ "$USER" == "pedro.lisboa" ]]; then
     # pedro.lisboa user
     if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
         # Ubuntu
-        export SONAR_WORKSPACE=/home/pedrolisboa/Workspace/lps/SonarAnalysis
-        export INPUTDATAPATH=/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification 
+        export SONAR_WORKSPACE=/home/pedro.lisboa/Workspace/lps/SonarAnalysis
+        export INPUTDATAPATH=/home/pedro.lisboa/Workspace/lps/Marinha/Data/SONAR/Classification
     fi
 elif [[ "$USER" == "pedrolisboa" ]]; then
     # pedro.lisboa user
     if [ "$OSTYPE" == "linux-gnu" ] || ["$OSTYPE" == "GNU/Linux"]; then
         # Ubuntu
         export SONAR_WORKSPACE=/home/pedrolisboa/Workspace/lps/SonarAnalysis
-        export INPUTDATAPATH=/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification 
+        export INPUTDATAPATH=/home/pedrolisboa/Workspace/lps/Marinha/Data/SONAR/Classification
     fi
 fi
 

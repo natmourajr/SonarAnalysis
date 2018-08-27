@@ -1,4 +1,4 @@
-""" 
+"""
   Author: Pedro Henrique Braga Lisboa
           pedrolisboa at poli.ufrj.br
   This module contains all Cross-Validation utilities
@@ -36,9 +36,9 @@ def Kfold(dataset, k, shuffle=False, stratify=False):
 
 
 class NestedCV:
-    def __init__(self, n_cvs, n_folds,cvs_paths, audiodatapath, db_name='4classes', cv_filemask='10_folds_cv_runs_nested_'):
+    def __init__(self, n_cvs, n_folds,cvs_paths, inputdatapath, db_name='4classes', cv_filemask='10_folds_cv_runs_nested_'):
         self.resultspath = cvs_paths
-        self.audiodatapath = audiodatapath
+        self.audiodatapath = inputdatapath + '/' + db_name
         self.datapath = cvs_paths + '/' + db_name
         self.n_cvs = n_cvs
         self.n_folds = n_folds
@@ -70,6 +70,7 @@ class SonarRunsCV(BaseCrossValidator):
         runs_info = SonarRunsInfo(inputdatapath, verbose)
         self.inputdatapath = inputdatapath
         self.n_splits = n_splits
+        self.class_folders = runs_info.class_folders
         self.runs = runs_info.runs
         self.runs_named = runs_info.runs_named
 
