@@ -117,14 +117,14 @@ class NoveltyDetectionAnalysis(object):
             print '[+] Time to read data file: ' + str(m_time) + ' seconds'
 
             # correct format
-            self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
+            self.all_trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
 
             # Same number of events in each class
             self.qtd_events_biggest_class = 0
             self.biggest_class_label = ''
 
             # Define the class labels with ascii letters in uppercase
-            self.class_labels = list(string.ascii_uppercase)[:self.trgt_sparse.shape[1]]
+            self.class_labels = list(string.ascii_uppercase)[:self.all_trgt_sparse.shape[1]]
 
             new_target = np.zeros(0)
             new_data = np.zeros([0, self.all_data.shape[1] * self.n_windows])
@@ -152,10 +152,15 @@ class NoveltyDetectionAnalysis(object):
                 print "Total of events in the dataset is {:d}".format(self.all_trgt.shape[0])
 
             if bool(self.parameters["InputDataConfig"]["balance_data"]):
+                print "Balacing data..."
                 self.balanceData()
 
             # turn targets in sparse mode
-            self.trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
+            self.all_trgt_sparse = np_utils.to_categorical(self.all_trgt.astype(int))
+            
+            if self.parameters["HyperParameters"]["classifier_output_activation_function"] in ["tanh"]:
+                # Transform the output into [-1,1]
+                self.all_trgt_sparse = 2*self.all_trgt_sparse-np.ones(self.all_trgt_sparse.shape)
 
     def balanceData(self):
         # Process data
@@ -194,7 +199,7 @@ class NoveltyDetectionAnalysis(object):
         self.all_trgt = balanced_trgt
 
     def getData(self):
-        return [self.all_data, self.all_trgt, self.trgt_sparse]
+        return [self.all_data, self.all_trgt, self.all_trgt_sparse]
 
     def getClassLabels(self):
         return self.class_labels
@@ -205,8 +210,10 @@ class NoveltyDetectionAnalysis(object):
         if n_folds < 2:
             print 'Invalid number of folds'
             return -1
-
-        file_name = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", "%i_folds_cross_validation.jbl"%(n_folds))
+        if bool(self.parameters["InputDataConfig"]["balance_data"]):
+            file_name = os.path.join(self.RESULTS_PATH, "%i_folds_cross_validation_balanced_data.jbl"%(n_folds))
+        else: 
+            file_name = os.path.join(self.RESULTS_PATH, "%i_folds_cross_validation.jbl"%(n_folds))
 
         if not os.path.exists(file_name):
             if self.verbose:

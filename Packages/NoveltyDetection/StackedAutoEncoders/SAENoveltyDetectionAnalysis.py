@@ -32,19 +32,23 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
     def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=False):
         super(SAENoveltyDetectionAnalysis, self).__init__(parameters=parameters, model_hash=model_hash, load_hash=load_hash, load_data=load_data, verbose=verbose)
         
-        self.SAE = {}
-        
         self.trn_data = {}
         self.trn_trgt = {}
         self.trn_trgt_sparse = {}
-        for inovelty in range(self.trgt_sparse.shape[1]):
+        self.SAE = {}
+        
+        for inovelty in range(self.all_trgt_sparse.shape[1]):
             self.trn_data[inovelty] = self.all_data[self.all_trgt != inovelty]
             self.trn_trgt[inovelty] = self.all_trgt[self.all_trgt != inovelty]
             self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] = self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] - 1
             self.trn_trgt_sparse[inovelty] = np_utils.to_categorical(self.trn_trgt[inovelty].astype(int))
-
+            
+            if self.parameters["HyperParameters"]["classifier_output_activation_function"] in ["tanh"]:
+                self.trn_trgt_sparse[inovelty] = 2 * self.trn_trgt_sparse[inovelty] - np.ones(self.trn_trgt_sparse[inovelty].shape)
+            
+            
     def createSAEModels(self):        
-        for inovelty in range(self.trgt_sparse.shape[1]):
+        for inovelty in range(self.all_trgt_sparse.shape[1]):
             # Initialize SAE objects for all novelties
             self.SAE[inovelty] = StackedAutoEncoders(parameters=self.parameters,
                                                      save_path=self.getBaseResultsPath(),

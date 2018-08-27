@@ -36,11 +36,14 @@ class NNNoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         self.trn_trgt_sparse = {}
         self.models = {}
         
-        for inovelty in range(self.trgt_sparse.shape[1]):
+        for inovelty in range(self.all_trgt_sparse.shape[1]):
             self.trn_data[inovelty] = self.all_data[self.all_trgt != inovelty]
             self.trn_trgt[inovelty] = self.all_trgt[self.all_trgt != inovelty]
             self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] = self.trn_trgt[inovelty][self.trn_trgt[inovelty] > inovelty] - 1
             self.trn_trgt_sparse[inovelty] = np_utils.to_categorical(self.trn_trgt[inovelty].astype(int))
+            
+            if self.parameters["HyperParameters"]["classifier_output_activation_function"] in ["tanh"]:
+                self.trn_trgt_sparse[inovelty] = 2 * self.trn_trgt_sparse[inovelty] - np.ones(self.trn_trgt_sparse[inovelty].shape)
             
             self.models[inovelty] = NeuralNetworks(parameters=self.parameters,
                                                    save_path=self.getBaseResultsPath(),

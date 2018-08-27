@@ -173,8 +173,7 @@ class StackedAutoEncoders:
         return model
 
     # Method that returns the encoder of an intermediate layer.
-    # noinspection PyUnusedLocal
-    def get_encoder(self, data, trgt, hidden_neurons=None, layer=1, ifold=0):
+    def get_stacked_encoder(self, data, trgt, hidden_neurons=None, layer=1, ifold=0):
         if hidden_neurons is None:
             hidden_neurons = [1]
         for i in range(len(hidden_neurons)):
@@ -211,12 +210,12 @@ class StackedAutoEncoders:
 
             layer_model = load_model(file_name, custom_objects={
                 '%s' % self.parameters["HyperParameters"]["loss"]: self.lossFunction})
-            layer_weights = layer_model.layers[0].get_weights()
+            encoder_layer_weights = layer_model.layers[0].get_weights()
             if ilayer == 1:
-                model.add(Dense(units=hidden_neurons[0], input_dim=norm_data.shape[1], weights=layer_weights,
+                model.add(Dense(units=hidden_neurons[0], input_dim=norm_data.shape[1], weights=encoder_layer_weights,
                                 trainable=True))
             else:
-                model.add(Dense(units=hidden_neurons[ilayer - 1], weights=layer_weights, trainable=True))
+                model.add(Dense(units=hidden_neurons[ilayer - 1], weights=encoder_layer_weights, trainable=True))
 
             model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
 
@@ -252,8 +251,6 @@ class StackedAutoEncoders:
             return ifold, classifier, trn_desc
 
         train_id, test_id = self.CVO[ifold]
-
-        
 
         best_init = 0
         best_loss = 999
@@ -463,7 +460,6 @@ class StackedAutoEncoders:
 
         norm_data = self.normalize_data(data, ifold)
 
-        # noinspection PyUnusedLocal
         best_init = 0
         best_loss = 999
 
@@ -499,12 +495,12 @@ class StackedAutoEncoders:
 
                 layer_model = load_model(file_name, custom_objects={
                     '%s' % self.parameters["HyperParameters"]["loss"]: self.lossFunction})
-                layer_weights = layer_model.layers[0].get_weights()
+                encoder_weights = layer_model.layers[0].get_weights()
                 if ilayer == 1:
-                    model.add(Dense(units=hidden_neurons[0], input_dim=norm_data.shape[1], weights=layer_weights,
+                    model.add(Dense(units=hidden_neurons[0], input_dim=norm_data.shape[1], weights=encoder_weights,
                                     trainable=self.parameters["TechniqueParameters"]["allow_change_weights"]))
                 else:
-                    model.add(Dense(units=hidden_neurons[ilayer - 1], weights=layer_weights,
+                    model.add(Dense(units=hidden_neurons[ilayer - 1], weights=encoder_weights,
                                     trainable=self.parameters["TechniqueParameters"]["allow_change_weights"]))
 
                 model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
