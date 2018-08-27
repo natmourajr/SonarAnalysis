@@ -6,7 +6,8 @@ from keras import backend as K
 
 
 def spIndex(y_true, y_pred):
-    num_classes = 4
+    num_classes = K.int_shape(y_pred)[1] # y_true returns (None, None) for int_shape
+                                         # y_pred returns (None, num_classes)
 
     true_positives = K.sum(K.cast(y_true * K.one_hot(K.argmax(y_pred, axis=1), num_classes), dtype='float32'))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
