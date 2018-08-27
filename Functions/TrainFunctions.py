@@ -1468,9 +1468,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 x_train, y_train = preprocessing_fn(x_train, y_train)
                 x_test, y_test = preprocessing_fn(x_test, y_test)
 
-            x_train = x_train[::100]
-            y_train = y_train[::100]
-
             x_train = x_train[y_train != novelty_cls]
             x_test = x_test[y_test != novelty_cls]
 
@@ -1525,6 +1522,9 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
             np.save(model.model_recovery_history, model_history)
             np.save(model.model_recovery_predictions, model_predictions)
+
+            if K.backend() == 'tensorflow':  # solve tf memory leak
+                K.clear_session()
 
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
