@@ -10,10 +10,7 @@ from sklearn import cross_validation
 from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix
-<<<<<<< HEAD
 
-=======
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
@@ -24,6 +21,8 @@ from keras.models import load_model
 from keras import backend as backend
 
 import matplotlib.pyplot as plt
+
+from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
 
 plt.rcParams['xtick.labelsize'] = 15
 plt.rcParams['ytick.labelsize'] = 15
@@ -402,10 +401,10 @@ class NeuralClassification(ClassificationBaseClass):
                     color='k',alpha=0.7,linewidth=2.5)
         ax.set_ylabel('Acc',fontweight='bold',fontsize=15)
         ax.set_xlabel('Neurons',fontweight='bold',fontsize=15)
-<<<<<<< HEAD
+
         ax.grid()
         ax.xaxis.set_ticks(xtick)
-=======
+
         return None
     def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
         #print 'NeuralClassication analysis train plot function'
@@ -433,7 +432,7 @@ class NeuralClassification(ClassificationBaseClass):
 
         ax.set_ylabel('MSE',fontweight='bold',fontsize=15)
         ax.set_xlabel('Epochs',fontweight='bold',fontsize=15)
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
+
         
         ax.grid()
         plt.legend()
@@ -509,7 +508,6 @@ class NeuralClassification(ClassificationBaseClass):
         else:
             [output] = joblib.load(file_name)
 
-<<<<<<< HEAD
     def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
         print 'NeuralClassication analysis train plot function'
         # checar se a analise ja foi feita
@@ -594,7 +592,51 @@ class NeuralClassification(ClassificationBaseClass):
 
 
 
-=======
+
 	return K.mean(K.equal(trgt, K.lesser(output, threshold)))
-	
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
+
+
+class CnnAnalysis:
+    def __init__(self, ncv_obj, trnParams, resultspath, analysis_path):
+        self.n_cv = ncv_obj
+        self.params = trnParams
+
+        self.an_path = analysis_path
+        self.resultspath = resultspath
+        self.modelpath = resultspath + '/' + trnParams.getParamPath()
+
+        self.predictions = dict
+
+    def fetchPredictions(self):
+        for cv_name, cv in self.n_cv.cv.items():
+            foldpath = self.modelpath + '/' + cv_name
+            self.predictions[cv_name] = pd.read_csv(self.path + 'predictions/pred.csv',
+                                                    index_col=[0, 1, 2])
+
+    def reconstructPredictions(self, data, trgt, image_window):
+        for cv_name, cv in self.n_cv.cv.items():
+            for i_fold, (train_index, test_index) in cv:
+                run_info = SonarRunsInfo(cv)
+                x_test, fold_trgt = lofar2image(data, trgt, test_index,
+                                                image_window, image_window, run_indices_info=run_info)
+
+        #         model = load_model(path + 'best_states/' + cls + '/' +  fold_file)
+        #         prediction = model.predict(x_test)
+        #
+        #         del model
+        #
+        #         prediction = np.concatenate(
+        #                     [prediction[:, :key],
+        #                      np.repeat(np.nan, prediction.shape[0])[:, np.newaxis],
+        #                      prediction[:, key:]],
+        #                     axis=1)
+        #
+        #         prediction = pd.DataFrame(prediction, columns= np.concatenate([class_labels.values()]),
+        #                                   index=pd.MultiIndex.from_product(
+        #                                       [['fold_%i' % int(fold_file[0])], [key], range(prediction.shape[0])]))
+        #         prediction['Label'] = np.array(fold_trgt, dtype = int)
+        #
+        #         prediction_pd = pd.concat([prediction_pd, prediction], axis = 0)
+        #
+        #         gt = np.concatenate([gt, fold_trgt], axis= 0)
+

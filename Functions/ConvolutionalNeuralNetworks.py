@@ -103,11 +103,11 @@ class ModelPaths(ConvolutionPaths):
         self.balance_mode = balance
         self.model_files = self.fold_path + '/' + 'states'
         self.model_best = self.fold_path + '/' + 'best_states'
-        self.model_history = self.fold_path + '/' + 'history'
-        self.model_recovery_history = self.fold_path + '/' + 'history/~history.npy'
+        self.model_history = self.fold_path + '/' + 'history.csv'
+        self.model_recovery_history = self.fold_path + '/' + '~history.npy'
 
-        self.model_predictions = self.fold_path + '/' + 'predictions'
-        self.model_recovery_predictions = self.fold_path + '/' + 'predictions/~predictions.npy'
+        self.model_predictions = self.fold_path + '/' + 'predictions.csv'
+        self.model_recovery_predictions = self.fold_path + '/' + '~predictions.npy'
 
         self.model_recovery_state = self.fold_path + '/' + '~rec_state.h5'
         self.model_recovery_folds = self.fold_path + '/' + '~rec_folds.jbl'
@@ -125,7 +125,7 @@ class ModelPaths(ConvolutionPaths):
         # elif exists(self.model_recovery_state):
         #   return 'Recovery'
         else:
-            self.createFolders(self.model_files, self.model_best, self.model_history, self.model_predictions)
+            self.createFolders(self.model_files, self.model_best)
             self.status = 'Untrained'
 
         self.trained_folds_files = os.listdir(self.model_files)
@@ -284,10 +284,15 @@ class KerasModel(_CNNModel):
                                      class_weight=class_weight,
                                      verbose=verbose
                                      )
+
             if np.array(history.history[restart_monitor]).max() < restart_tol:
                 print "Max: %f" % np.array(history.history[restart_monitor]).max()
                 print "Restarting"
+                self.build()  # reset model
                 max_restarts -= 1
+            else:
+                break
+
 
         self.history = history.history
         return history.history

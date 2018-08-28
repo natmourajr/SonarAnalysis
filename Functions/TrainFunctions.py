@@ -1437,8 +1437,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
     def _fitModel(self, model, data, trgt, class_labels, transform_fn, preprocessing_fn=None, novelty_cls=None,
                   verbose=False):
-        from pympler.tracker import SummaryTracker
-        tracker = SummaryTracker()
+        # from pympler.tracker import SummaryTracker
+        # tracker = SummaryTracker()
 
         n_classes = len(class_labels)
 
@@ -1471,9 +1471,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 x_train, y_train = preprocessing_fn(x_train, y_train)
                 x_test, y_test = preprocessing_fn(x_test, y_test)
 
-            x_train = x_train[::100]
-            y_train = y_train[::100]
-
             x_train = x_train[y_train != novelty_cls]
             x_test = x_test[y_test != novelty_cls]
 
@@ -1486,7 +1483,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             y_train = Functions.NpUtils.DataTransformation.trgt2categorical(y_train, n_classes)
 
             nv_mask = np.ones(y_train.shape[1], dtype=bool)
-            #nv_mask[novelty_cls or []] = False
             if not novelty_cls is None:
                 nv_mask[novelty_cls] = False
 
@@ -1512,9 +1508,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                   validation_data=(x_test, y_test[:, nv_mask]),
                                                   callbacks=[bestmodel, stopping],
                                                   class_weight=class_weights, verbose=verbose,
-                                                  max_restarts = 4, restart_tol = 0.60)
-
-            #model_predictions[fold_count] = model.predict(x_test)
+                                                  max_restarts=4, restart_tol = 0.60)
 
             model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
             model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
@@ -1524,7 +1518,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count][:, :novelty_cls],
                      np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
-                     model_predictions[fold_count][:, novelty_cls:]],
+                     model_predictions[fold_count][:, novelty_cls:],
+                     y_test],
                     axis=1)
 
             np.save(model.model_recovery_history, model_history)
@@ -1535,7 +1530,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
 
-            tracker.print_diff()
+            #tracker.print_diff()
 
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
@@ -1563,8 +1558,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
         pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
 
-        hist_file = model.model_history + '/hist.csv'
-        preds_file = model.model_predictions + '/pred.csv'
+        hist_file = model.model_history
+        preds_file = model.model_predictions
 
         pd_pred.to_csv(preds_file, sep=',')
         pd_hist.to_csv(hist_file, sep=',')
