@@ -140,6 +140,15 @@ class ModelPaths(ConvolutionPaths):
 
 
 class _CNNModel(ModelPaths):
+    """Base class for all Convolutional Neural Networks models
+
+        This class serves as an interface between the parameter class and API-specific
+        model classes (see KerasModel class).
+
+       Implementations must define load, save, build, fit, evaluate and predict in order to interface with
+       the desired API
+    """
+
     def __init__(self, trnParams):
         super(_CNNModel, self).__init__(trnParams)
         if not isinstance(trnParams, TrnParamsConvolutional):
@@ -160,9 +169,14 @@ class _CNNModel(ModelPaths):
             self.saveParams(trnParams)
 
     def summary(self):
+        """Returns a summary of the network topology and training parameters"""
         raise NotImplementedError
 
     def mountParams(self, trnParams):
+        """Parses the parameters to attributes of the instance
+
+           trnParams (TrnParamsConvolutional): parameter object
+        """
         for param, value in trnParams:
             if param is None:
                 raise ValueError('The parameters configuration received by _CNNModel must be complete'
@@ -173,9 +187,12 @@ class _CNNModel(ModelPaths):
         # self.model_name = trnParams.getParamStr()
 
     def saveParams(self, trnParams):
+        """Save parameters into a pickle file"""
+
         SystemIO.save(trnParams.toNpArray(), self.path.model_info_file)
 
     def loadInfo(self):
+        """Load parameters from a pickle file"""
         params_array = SystemIO.load(self.path.model_info_file)
         return TrnParamsConvolutional(*params_array)
 
@@ -205,10 +222,18 @@ class _CNNModel(ModelPaths):
 
 
 class KerasModel(_CNNModel):
+    """Keras Sequential Model wrapper class
+
+       Inherits from _CNNModel and adds details
+       for interfacing with the Keras API
+    """
+
     def __init__(self, trnParams):
         super(KerasModel, self).__init__(trnParams)
 
     def build(self):
+        """Compile Keras model using the parameters loaded into the instance"""
+
         if self.model is not None:
             warnings.warn('Model is not empty and was already trained.\n'
                           'Run purge method for deleting the model variable',
@@ -225,6 +250,20 @@ class KerasModel(_CNNModel):
                            )
 
     def fit(self, x_train, y_train, callbacks, validation_data=None, class_weight=None, verbose=0):
+        """Model training routine
+
+           x_train (numpy.nparray): model input data
+           y_train (numpy.nparray): input data labels
+           callbacks: manual callbacks insertion. It will be removed on future commits
+           validation_data (<numpy.nparray, numpy.nparray>): tuple containing input and trgt
+                                                             data for model validation. <input, trgt>
+           class_weight (dict): dictionary mapping class indices to a floating point value,
+                                used for weighting the loss function during training
+                                (see ConvolutionTrainFunction.getClassWeights)
+
+            :returns : dictionary containing loss and metrics for each epoch
+        """
+
         # TODO fix method signature removing manual callback selection
         if self.model is None:
             raise StandardError('Model is not built. Run build method or load model before fitting')
@@ -242,32 +281,50 @@ class KerasModel(_CNNModel):
         return history.history
 
     def evaluate(self, x_test, y_test, verbose=0):
+        """Model evaluation on a test set
+
+            x_test: input data
+            y_test: data labels
+
+            :returns : evaluation results
+        """
+
         if self.model is None:
             raise StandardError('Model is not built. Run build method or load model before fitting')
 
-        val_history = self.model.evaluate(x_test,
+        test_results = self.model.evaluate(x_test,
                                           y_test,
                                           batch_size=self.batch_size,
                                           verbose=verbose)
-        self.val_history = val_history
-        return val_history
+        self.val_history = test_results
+        return test_results
 
     def get_layer_n_output(self, n, data):
+        """Returns the output of layer n of the model for the given data"""
+
         intermediate_layer_model = Model(inputs=self.model.input,
                                          outputs=self.model.layers[n - 1].output)
         intermediate_output = intermediate_layer_model.predict(data)
         return intermediate_output
 
     def predict(self, data, verbose=0):
+        """Model evaluation on a data set
+
+            :returns : model predictions (numpy.nparray / shape: <n_samples, n_outputs>
+        """
+
         if self.model is None:
             raise StandardError('Model is not built. Run build method or load model before fitting')
         return self.model.predict(data, 1, verbose)  # ,steps)
 
     def load(self, file_path):
+        """Load model info and weights from a .h5 file"""
         self.model = load_model(file_path)
 
     def save(self, file_path):
+        """Save current model state and weights on an .h5 file"""
         self.model.save(file_path)
 
     def purge(self):
+        """Delete model state"""
         del self.model
