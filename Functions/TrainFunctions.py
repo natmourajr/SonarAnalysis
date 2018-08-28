@@ -1511,7 +1511,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             model_history[fold_count] = model.fit(x_train, y_train[:, nv_mask],
                                                   validation_data=(x_test, y_test[:, nv_mask]),
                                                   callbacks=[bestmodel, stopping],
-                                                  class_weight=class_weights, verbose=verbose)
+                                                  class_weight=class_weights, verbose=verbose,
+                                                  max_restarts = 4, restart_tol = 0.60)
 
             #model_predictions[fold_count] = model.predict(x_test)
 

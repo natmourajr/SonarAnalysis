@@ -249,7 +249,8 @@ class KerasModel(_CNNModel):
                            metrics=self.metrics
                            )
 
-    def fit(self, x_train, y_train, callbacks, validation_data=None, class_weight=None, verbose=0):
+    def fit(self, x_train, y_train, callbacks, validation_data=None, class_weight=None,
+            verbose=0, max_restarts=0, restart_tol=None, restart_monitor='spIndex'):
         """Model training routine
 
            x_train (numpy.nparray): model input data
@@ -261,22 +262,33 @@ class KerasModel(_CNNModel):
                                 used for weighting the loss function during training
                                 (see ConvolutionTrainFunction.getClassWeights)
 
+           max_restarts (int): max number of restarts if the desired conditions are not reached
+           restart_tol: tolerance value for the restart condition
+           restart_monitor: condition for restarting training
+
             :returns : dictionary containing loss and metrics for each epoch
         """
 
+        # TODO pass restart to a Keras callback
         # TODO fix method signature removing manual callback selection
         if self.model is None:
             raise StandardError('Model is not built. Run build method or load model before fitting')
 
-        history = self.model.fit(x_train,
-                                 y_train,
-                                 epochs=self.epochs,
-                                 batch_size=self.batch_size,
-                                 callbacks=callbacks,
-                                 validation_data=validation_data,
-                                 class_weight=class_weight,
-                                 verbose=verbose
-                                 )
+        while max_restarts >= 0:
+            history = self.model.fit(x_train,
+                                     y_train,
+                                     epochs=self.epochs,
+                                     batch_size=self.batch_size,
+                                     callbacks=callbacks,
+                                     validation_data=validation_data,
+                                     class_weight=class_weight,
+                                     verbose=verbose
+                                     )
+            if np.array(history.history[restart_monitor]).max() < restart_tol:
+                print "Max: %f" % np.array(history.history[restart_monitor]).max()
+                print "Restarting"
+                max_restarts -= 1
+
         self.history = history.history
         return history.history
 
