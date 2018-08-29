@@ -15,7 +15,6 @@ from sklearn.externals import joblib
 
 # Database caracteristics
 datapath = os.getenv('OUTPUTDATAPATH')
-
 audiodatapath = os.getenv('INPUTDATAPATH')
 database = '4classes'
 n_pts_fft = 1024

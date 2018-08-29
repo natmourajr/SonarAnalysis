@@ -1525,7 +1525,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             np.save(model.model_recovery_history, model_history)
             np.save(model.model_recovery_predictions, model_predictions)
 
-            tracker.print_diff()
+            #tracker.print_diff()
 
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
