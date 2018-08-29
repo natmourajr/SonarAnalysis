@@ -4,19 +4,18 @@
 
     Description: This file contains functions used for Neural Network training.
 """
-
 import os
-import pickle
+from warnings import warn
+import pandas as pd
 import numpy as np
 import time
 
 from sklearn.externals import joblib
 from sklearn import preprocessing
-from sklearn import metrics
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation
-from keras.optimizers import Adam, SGD
+from keras.optimizers import Adam
 import keras.callbacks as callbacks
 from keras.utils import np_utils
 from keras.models import load_model
@@ -24,7 +23,9 @@ from keras import backend as K
 
 import multiprocessing
 
-from Functions import TrainParameters as trnparams
+import Functions.NpUtils.DataTransformation
+from Functions import TrainParameters as trnparams, SystemIO, CrossValidation
+from Functions.ConvolutionalNeuralNetworks import ConvolutionPaths
 
 num_process = multiprocessing.cpu_count()
 
@@ -32,6 +33,7 @@ num_process = multiprocessing.cpu_count()
     Function used to do a Fine Tuning in Stacked Auto Encoder for Classification of the data
     hidden_neurons contains the number of neurons in the sequence: [FirstLayer, SecondLayer, ... ]
 '''
+
 def SAEClassificationTrainFunction(data=None, trgt=None, ifold=0,
                                    n_folds=2, hidden_neurons=[],
                                    trn_params=None, save_path='', dev=False):
@@ -1367,3 +1369,207 @@ def SAEClassifierNoveltyTrainFunction(data=None, trgt=None, inovelty=0, ifold=0,
         [trn_desc] = joblib.load(file_name)
 
     return [classifier,trn_desc]
+
+class ConvolutionTrainFunction(ConvolutionPaths):
+    def __init__(self):
+        # Path variables
+        super(ConvolutionTrainFunction, self).__init__()
+
+    def loadData(self, dataset):
+        """Load dataset for model use
+
+        Args:
+        dataset(tuple): (samples, labels, unique(labels))
+        """
+        self.dataset = dataset
+
+    def loadModels(self, model_list, model_initializer):
+        self.models = [model_initializer(model) for model in model_list]
+
+    def loadFolds(self, folds):
+        self.fold_config = folds
+        self.n_folds = len(folds)
+
+    def train(self, transform_fn, preprocessing_fn, fold_mode='shuffleRuns', fold_balance='class_weights', novelty_classes= None,
+              verbose=(0, 0, 0)):
+
+        novelty_classes = novelty_classes or [None]
+        data, trgt, class_labels = self.dataset
+
+        n_models = len(self.models)
+        for i_model, model in enumerate(self.models):
+            if verbose[0]:
+                print 'Model %i of %i' % (i_model + 1, n_models)
+                trained_folds = []
+                # model.pprint()
+
+            status = model.selectFoldConfig(self.n_folds, fold_mode, fold_balance)
+            if model.status is 'Trained':
+                print "Already trained for current fold configuration"
+                continue
+            elif model.status is 'Recovery':
+                print "Resuming Training"
+                if novelty_classes is None:
+                    pass
+                    #trained_folds = [self._parseFoldNumber(fold_file) for fold_file in os.listdir(model.model_files)]
+                else:
+                    pass
+
+            start = time.time()
+            model_results = np.array(
+                map(lambda cls: self._fitModel(model,
+                                               data,
+                                               trgt,
+                                               class_labels,
+                                               transform_fn,
+                                               preprocessing_fn,
+                                               novelty_cls=cls,
+                                               verbose=verbose[1]),
+                    novelty_classes),
+                dtype=object)
+
+            self._saveResults(model, model_results, novelty_classes, class_labels)
+
+            if verbose[0]:
+                end = time.time()
+                print 'Training: %i (seg) / %i (min) /%i (hours)' % (
+                end - start, (end - start) / 60, (end - start) / 3600)
+
+    def _fitModel(self, model, data, trgt, class_labels, transform_fn, preprocessing_fn=None, novelty_cls=None,
+                  verbose=False):
+        # from pympler.tracker import SummaryTracker
+        # tracker = SummaryTracker()
+
+        n_classes = len(class_labels)
+
+        if not novelty_cls is None:
+            novelty_path_offset = '/' + class_labels[novelty_cls] + '/'
+        else:
+            novelty_path_offset = ''
+
+        if model.status == 'Untrained':
+            model_history = np.empty(self.n_folds, dtype=np.ndarray)
+            model_predictions = np.empty(self.n_folds, dtype=np.ndarray)
+        else:
+            model_history = np.load(model.model_recovery_history)
+            model_predictions = np.load(model.model_recovery_predictions)
+        trained_folds = map(self._parseFoldNumber, model.trained_folds_files)
+
+        print model.status
+        print trained_folds
+
+        for fold_count, (train_index, test_index) in enumerate(self.fold_config):
+            if fold_count in trained_folds:
+                continue
+
+            x_train , y_train = transform_fn(all_data=data, all_trgt=trgt,
+                                            index_info=train_index, info='train')
+            x_test, y_test = transform_fn(all_data=data, all_trgt=trgt,
+                                          index_info=test_index, info='val')
+
+            if preprocessing_fn is not None:
+                x_train, y_train = preprocessing_fn(x_train, y_train)
+                x_test, y_test = preprocessing_fn(x_test, y_test)
+
+            x_train = x_train[y_train != novelty_cls]
+            x_test = x_test[y_test != novelty_cls]
+
+            y_train = y_train[y_train != novelty_cls]
+            y_test = y_test[y_test != novelty_cls]
+
+            class_weights = self._getGradientWeights(y_train, mode='standard', novelty_cls=novelty_cls)
+
+            y_test = Functions.NpUtils.DataTransformation.trgt2categorical(y_test, n_classes)
+            y_train = Functions.NpUtils.DataTransformation.trgt2categorical(y_train, n_classes)
+
+            nv_mask = np.ones(y_train.shape[1], dtype=bool)
+            if not novelty_cls is None:
+                nv_mask[novelty_cls] = False
+
+            if verbose:
+                print "Fold: " + str(fold_count) + '\n'
+                print "Class Weights:"
+                for cls in class_weights:
+                    print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+
+            # PASSAR PARA TRAINPARAMETERS
+            # TODO pass novelty path creation to ModelPath class
+            if not SystemIO.exists(model.model_best + novelty_path_offset):
+                SystemIO.mkdir(model.model_best + novelty_path_offset)
+            if not SystemIO.exists(model.model_files + novelty_path_offset):
+                SystemIO.mkdir(model.model_files + novelty_path_offset)
+
+            bestmodel = callbacks.ModelCheckpoint(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count,
+                                                  monitor='val_loss', mode='min', verbose=1, save_best_only=True)
+
+            stopping = callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=1, mode='min')
+            model.build()
+            model_history[fold_count] = model.fit(x_train, y_train[:, nv_mask],
+                                                  validation_data=(x_test, y_test[:, nv_mask]),
+                                                  callbacks=[bestmodel, stopping],
+                                                  class_weight=class_weights, verbose=verbose,
+                                                  max_restarts=4, restart_tol = 0.60)
+
+            model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
+            model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
+
+            model_predictions[fold_count] = model.predict(x_test)
+            if not novelty_cls is None:
+                model_predictions[fold_count] = np.concatenate(
+                    [model_predictions[fold_count][:, :novelty_cls],
+                     np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
+                     model_predictions[fold_count][:, novelty_cls:],
+                     y_test],
+                    axis=1)
+
+            np.save(model.model_recovery_history, model_history)
+            np.save(model.model_recovery_predictions, model_predictions)
+
+            tracker.print_diff()
+
+            if K.backend() == 'tensorflow':  # solve tf memory leak
+                K.clear_session()
+
+            #tracker.print_diff()
+
+        os.remove(model.model_recovery_predictions)
+        os.remove(model.model_recovery_history)
+        return model_history, model_predictions
+
+    @staticmethod
+    def _parseFoldNumber(fold_str):
+        warn("Limit : [0,9]!")
+        return int(fold_str[0])
+
+    @staticmethod
+    def _saveResults(model, model_results, novelty_classes, class_labels):
+        history_ar = [history for history, _ in model_results]
+        predictions_ar = [predictions for _, predictions in model_results]
+        # print [[[nv_cls], [range(predictions.shape[0])]]
+        #                   for nv_cls, prediction in zip(novelty_classes, predictions_ar)]
+        predictions_pd = [[pd.DataFrame(fold_prediction, columns=class_labels.values(),
+                                       index= pd.MultiIndex.from_product([['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
+                          for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in zip(novelty_classes, predictions_ar)]
+        history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
+                                            [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
+                           for i_fold, fold_history in enumerate(history)] for nv_cls, history in
+                          zip(novelty_classes, history_ar)]
+
+        pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
+        pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
+
+        hist_file = model.model_history
+        preds_file = model.model_predictions
+
+        pd_pred.to_csv(preds_file, sep=',')
+        pd_hist.to_csv(hist_file, sep=',')
+
+    def _getGradientWeights(self, y_train, mode = 'standard', novelty_cls=None):
+        cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)
+        min_class = min(event_count)
+        if not novelty_cls is None:
+            cls_indices = [cls if cls < novelty_cls else cls - 1
+                           for cls in cls_indices if cls != novelty_cls]
+        print cls_indices
+        return {cls_index: float(min_class) / cls_count
+                for cls_index, cls_count in zip(cls_indices, event_count)}
