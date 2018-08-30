@@ -1,10 +1,11 @@
 """
     This file contents some classification analysis functions
 """
-
+import gc
 import os
 import time
 import numpy as np
+import pandas as pd
 
 from sklearn import cross_validation
 from sklearn.externals import joblib
@@ -590,53 +591,53 @@ class NeuralClassification(ClassificationBaseClass):
 
         return fig
 
-
-
-
-	return K.mean(K.equal(trgt, K.lesser(output, threshold)))
+        #return K.mean(K.equal(trgt, K.lesser(output, threshold)))
 
 
 class CnnAnalysis:
-    def __init__(self, ncv_obj, trnParams, resultspath, analysis_path):
+    def __init__(self, ncv_obj, trnParams, package_name, analysis_name):
         self.n_cv = ncv_obj
         self.params = trnParams
 
-        self.an_path = analysis_path
-        self.resultspath = resultspath
-        self.modelpath = resultspath + '/' + trnParams.getParamPath()
+        self.an_path = package_name + '/' + analysis_name
+        self.resultspath = package_name
+        self.modelpath = package_name + '/' + trnParams.getParamPath()
 
-        self.predictions = dict
+        self.predictions = dict()
 
     def fetchPredictions(self):
         for cv_name, cv in self.n_cv.cv.items():
-            foldpath = self.modelpath + '/' + cv_name
-            self.predictions[cv_name] = pd.read_csv(self.path + 'predictions/pred.csv',
+            fold_path = self.modelpath + '/%s/predictions.csv' % cv_name
+            self.predictions[cv_name] = pd.read_csv(fold_path,
                                                     index_col=[0, 1, 2])
 
-    def reconstructPredictions(self, data, trgt, image_window):
+    def _reconstructPredictions(self, data, trgt, class_labels, image_window):
+        run_info = SonarRunsInfo(self.n_cv.audiodatapath)
         for cv_name, cv in self.n_cv.cv.items():
-            for i_fold, (train_index, test_index) in cv:
-                run_info = SonarRunsInfo(cv)
+            gt = np.array([])
+            fold_path = self.modelpath + '/%s' % cv_name
+            predictions = pd.DataFrame(columns=class_labels.values())
+            prediction_pd = pd.DataFrame(columns=np.concatenate([class_labels.values(), ['Label']]))
+            for i_fold, (train_index, test_index) in enumerate(cv):
                 x_test, fold_trgt = lofar2image(data, trgt, test_index,
                                                 image_window, image_window, run_indices_info=run_info)
 
-        #         model = load_model(path + 'best_states/' + cls + '/' +  fold_file)
-        #         prediction = model.predict(x_test)
-        #
-        #         del model
-        #
-        #         prediction = np.concatenate(
-        #                     [prediction[:, :key],
-        #                      np.repeat(np.nan, prediction.shape[0])[:, np.newaxis],
-        #                      prediction[:, key:]],
-        #                     axis=1)
-        #
-        #         prediction = pd.DataFrame(prediction, columns= np.concatenate([class_labels.values()]),
-        #                                   index=pd.MultiIndex.from_product(
-        #                                       [['fold_%i' % int(fold_file[0])], [key], range(prediction.shape[0])]))
-        #         prediction['Label'] = np.array(fold_trgt, dtype = int)
-        #
-        #         prediction_pd = pd.concat([prediction_pd, prediction], axis = 0)
-        #
-        #         gt = np.concatenate([gt, fold_trgt], axis= 0)
+                model = load_model(fold_path + '/best_states/' + '/%i_fold.h5' % i_fold)
+                prediction = model.predict(x_test)
+
+                del model
+
+                prediction = pd.DataFrame(prediction, columns= np.concatenate([class_labels.values()]),
+                                          index=pd.MultiIndex.from_product(
+                                              [['fold_%i' % int(i_fold)], range(prediction.shape[0])]))
+                prediction['Label'] = np.array(fold_trgt, dtype=int)
+
+                prediction_pd = pd.concat([prediction_pd, prediction], axis=0)
+
+                gt = np.concatenate([gt, fold_trgt], axis=0)
+
+                gc.collect()
+            preds = prediction_pd.reindex(pd.MultiIndex.from_tuples(prediction_pd.index.values))
+            preds.to_csv(fold_path + '/pred.csv')
+
 

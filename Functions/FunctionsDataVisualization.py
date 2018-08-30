@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+from sklearn.metrics import confusion_matrix
+
 
 def add_subplot_axes(ax,rect,axisbg='w'):
     fig = plt.gcf()
@@ -28,50 +30,46 @@ def add_subplot_axes(ax,rect,axisbg='w'):
     subax.yaxis.set_tick_params(labelsize=y_labelsize)
     return
 
-
-def plotConfusionMatrix(confusionMatrix,
+def plotConfusionMatrix(predictions,
+                        trgt,
                         class_labels,
-                        filepath,
+                        ax,
+                        annot=True,
+                        normalize=True,
                         fontsize=15,
-                        figsize=(10, 6),
-                        cbar=True,
+                        figsize = (10,10),
+                        cbar_ax=None,
                         precision=2,
-                        normalize=True):
-    """Plots a confusion matrix as a heatmap using seaborn library functions.
+                        set_label = True):
+    """Plots a confusion matrix from the network output
 
-    Args:
-        confusion_matrix (numpy.ndarray): Resulting from
-        sklearn.metrics.confusionMatrix or an array with similar shape
-        class_labels (list): List containing the class labels in the order of the
-        confusion matrix parameter
-        figsize (tuple): A 2 item tuple, the first value with the horizontal size
-        of the figure,
-        the second with the vertical size. Defaults to (10,6).
-        filepath (string): Saving folder for the resulting plot.
-        fontsize (int): Font size for axes labels. Defaults to 15.
-        cbar (bool): Whether to draw a colorbar, Defaults to True
-        precision (int): Decimal portion length of confusion matrix tiles.
-        Defaults to 1
-    """
+        Args:
+            predictions (numpy.ndarray): Estimated target values
+            trgt (numpy.ndarray) : Correct target values
+            class_labels (dict): Mapping between target values and class names
+            confusion matrix parameter. If None
+            fontsize (int): Size of the annotations inside the matrix tiles
+            figsize (tuple): A 2 item tuple, the first value with the horizontal size
+            of the figure. Defaults to 15
+            the second with the vertical size. Defaults to (10,6).
+            precision (int): Decimal portion length of the tiles annotations.
+            Defaults to 2
+            set_label (bool): Whether to draw axis labels. Defaults to True
+        """
 
+    confusionMatrix = confusion_matrix(trgt, predictions)
     if normalize:
         cm = confusionMatrix.astype('float') / confusionMatrix.sum(axis=1)[:, np.newaxis]
     else:
         cm = confusionMatrix
 
     cm = pd.DataFrame(cm, index=class_labels, columns=class_labels)
-    fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(111)
+    sns.heatmap(cm, ax=ax, annot=annot, cbar_ax=cbar_ax, annot_kws={'fontsize': fontsize}, fmt=".%s%%" % precision,
+                cmap="Greys")
 
-    ax.set_ylabel('True Label', fontweight='bold', fontsize=fontsize)
-    ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
-
-    heatmap = sns.heatmap(cm, ax=ax, annot=True, fmt=".%s%%" % precision, cmap="Greys")
-
-    plt.savefig(filepath)
-    plt.close()
-    return plt
-
+    if set_label:
+        ax.set_ylabel('True Label', fontweight='bold', fontsize=fontsize)
+        ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
 
 
 def plotMetrics(y,

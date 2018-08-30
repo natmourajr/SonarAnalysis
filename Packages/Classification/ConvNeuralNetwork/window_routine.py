@@ -16,6 +16,8 @@ from sklearn.externals import joblib
 # Database caracteristics
 datapath = os.getenv('OUTPUTDATAPATH')
 audiodatapath = os.getenv('INPUTDATAPATH')
+results_path = os.getenv('PACKAGE_NAME')
+
 database = '4classes'
 n_pts_fft = 1024
 decimation_rate = 3
@@ -42,10 +44,10 @@ if ncv.exists():
 else:
     ncv.createCVs(data, trgt)
 
-if not exists(datapath + '/' + 'iter_2/window_run'):
-    mkdir(datapath + '/' 'iter_2/window_run')
+if not exists(results_path + '/' + 'iter_2/window_run'):
+    mkdir(results_path + '/' 'iter_2/window_run')
 
-window_grid = [10,20,30,40,50]
+window_grid = [10, 20, 30, 40, 50]
 image_stride = 10
 
 for cv_name, cv in ncv.cv.items():
