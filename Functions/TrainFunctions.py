@@ -1533,7 +1533,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
 
-
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
         return model_history, model_predictions

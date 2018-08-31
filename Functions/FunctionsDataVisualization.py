@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+
+from itertools import cycle
 from sklearn.metrics import confusion_matrix
 
 
@@ -72,20 +74,15 @@ def plotConfusionMatrix(predictions,
         ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
 
 
-def plotMetrics(y,
-                x,
-                hue,
-                data,
-                markers,
-                colors,
-                x_label=None,
-                y_label=None,
-                dodge=True,
-                figsize=(15, 8)):
-    if not x_label:
-        x_label = x
-    if not y_label:
-        y_label = y
+def plotScores(scores_dataframe,
+               class_labels,
+               title,
+               x_label="",
+               y_label=("Classification Efficiency", "SP Index"),
+               y_inf_lim = 0.80,
+               figsize=(15,8)):
+    molten_scores = scores_dataframe.melt(id_vars=['Class'])
+    order_cats = molten_scores['variable'].unique()
 
     sns.set_style("whitegrid")
 
@@ -97,14 +94,47 @@ def plotMetrics(y,
     plt.rc('legend', **{'fontsize': 15})
     plt.rc('font', weight='bold')
 
-    sns.pointplot(y=y, x=x, hue=hue, data=data, capsize=.02,
-                  dodge=dodge, markers=markers)
+    markers = ['^', 'o', '+', 's', 'p', 'o', '8', 'D', 'x']
+    linestyles = ['-', '-', ':', '-.']
+    colors = ['k', 'b', 'g', 'y', 'r', 'm', 'y', 'w']
 
-    ax.set_xlabel(x_label, fontsize=18, weight='bold')
-    ax.set_ylabel(y_label, fontsize=18, weight='bold')
+    def cndCycler(cycler, std_marker, condition, data):
+        return [std_marker if condition(var) else cycler.next() for var in data]
 
-    # SAVE THE FIGURE
-    raise NotImplementedError
+    sns.pointplot(y='value', x='variable', hue='Class',
+                  order=order_cats,
+                  data=molten_scores,
+                  markers=cndCycler(cycle(markers[:-1]),
+                                    markers[-1],
+                                    lambda x: x in class_labels.values(),
+                                    molten_scores['Class'].unique()),
+                  linestyles=cndCycler(cycle(linestyles[:-1]), linestyles[-1],
+                                       lambda x: x in class_labels.values(),
+                                       molten_scores['Class'].unique()),
+                  palette=cndCycler(cycle(colors[1:]), colors[0],
+                                    lambda x: not x in class_labels.values(),
+                                    molten_scores['Class'].unique()),
+                  dodge=.5,
+                  scale=1.7,
+                  errwidth=2.2, capsize=.1, ax=ax)
+
+    leg_handles = ax.get_legend_handles_labels()[0]
+
+    ax.legend(handles=leg_handles,
+              ncol=6, mode="expand", borderaxespad=0., loc=3)
+    ax.set_xlabel(x_label, fontsize=1, weight='bold')
+    ax.set_title(title, fontsize=25,
+                 weight='bold')
+    ax.set_ylabel(y_label[0], fontsize=20, weight='bold')
+    ax.set_ylim([y_inf_lim, 1.0001])
+
+    plt.xticks(rotation=25, ha='right')
+
+    ax2 = ax.twinx()
+    ax2.set_ylabel(y_label[1], fontsize=20, weight='bold')
+    ax2.set_ylim([y_inf_lim, 1.0001])
+
+    return fig
 
 
 def plotLOFARgram(image,ax = None, filename = None):
