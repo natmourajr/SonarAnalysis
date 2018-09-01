@@ -7,6 +7,10 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 
+from itertools import cycle
+from sklearn.metrics import confusion_matrix
+
+
 def add_subplot_axes(ax,rect,axisbg='w'):
     fig = plt.gcf()
     box = ax.get_position()
@@ -28,66 +32,57 @@ def add_subplot_axes(ax,rect,axisbg='w'):
     subax.yaxis.set_tick_params(labelsize=y_labelsize)
     return
 
-
-def plotConfusionMatrix(confusionMatrix,
+def plotConfusionMatrix(predictions,
+                        trgt,
                         class_labels,
-                        filepath,
+                        ax,
+                        annot=True,
+                        normalize=True,
                         fontsize=15,
-                        figsize=(10, 6),
-                        cbar=True,
+                        figsize = (10,10),
+                        cbar_ax=None,
                         precision=2,
-                        normalize=True):
-    """Plots a confusion matrix as a heatmap using seaborn library functions.
+                        set_label = True):
+    """Plots a confusion matrix from the network output
 
-    Args:
-        confusion_matrix (numpy.ndarray): Resulting from
-        sklearn.metrics.confusionMatrix or an array with similar shape
-        class_labels (list): List containing the class labels in the order of the
-        confusion matrix parameter
-        figsize (tuple): A 2 item tuple, the first value with the horizontal size
-        of the figure,
-        the second with the vertical size. Defaults to (10,6).
-        filepath (string): Saving folder for the resulting plot.
-        fontsize (int): Font size for axes labels. Defaults to 15.
-        cbar (bool): Whether to draw a colorbar, Defaults to True
-        precision (int): Decimal portion length of confusion matrix tiles.
-        Defaults to 1
-    """
+        Args:
+            predictions (numpy.ndarray): Estimated target values
+            trgt (numpy.ndarray) : Correct target values
+            class_labels (dict): Mapping between target values and class names
+            confusion matrix parameter. If None
+            fontsize (int): Size of the annotations inside the matrix tiles
+            figsize (tuple): A 2 item tuple, the first value with the horizontal size
+            of the figure. Defaults to 15
+            the second with the vertical size. Defaults to (10,6).
+            precision (int): Decimal portion length of the tiles annotations.
+            Defaults to 2
+            set_label (bool): Whether to draw axis labels. Defaults to True
+        """
 
+    confusionMatrix = confusion_matrix(trgt, predictions)
     if normalize:
         cm = confusionMatrix.astype('float') / confusionMatrix.sum(axis=1)[:, np.newaxis]
     else:
         cm = confusionMatrix
 
     cm = pd.DataFrame(cm, index=class_labels, columns=class_labels)
-    fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(111)
+    sns.heatmap(cm, ax=ax, annot=annot, cbar_ax=cbar_ax, annot_kws={'fontsize': fontsize}, fmt=".%s%%" % precision,
+                cmap="Greys")
 
-    ax.set_ylabel('True Label', fontweight='bold', fontsize=fontsize)
-    ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
-
-    heatmap = sns.heatmap(cm, ax=ax, annot=True, fmt=".%s%%" % precision, cmap="Greys")
-
-    plt.savefig(filepath)
-    plt.close()
-    return plt
+    if set_label:
+        ax.set_ylabel('True Label', fontweight='bold', fontsize=fontsize)
+        ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
 
 
-
-def plotMetrics(y,
-                x,
-                hue,
-                data,
-                markers,
-                colors,
-                x_label=None,
-                y_label=None,
-                dodge=True,
-                figsize=(15, 8)):
-    if not x_label:
-        x_label = x
-    if not y_label:
-        y_label = y
+def plotScores(scores_dataframe,
+               class_labels,
+               title,
+               x_label="",
+               y_label=("Classification Efficiency", "SP Index"),
+               y_inf_lim = 0.80,
+               figsize=(15,8)):
+    molten_scores = scores_dataframe.melt(id_vars=['Class'])
+    order_cats = molten_scores['variable'].unique()
 
     sns.set_style("whitegrid")
 
@@ -99,14 +94,47 @@ def plotMetrics(y,
     plt.rc('legend', **{'fontsize': 15})
     plt.rc('font', weight='bold')
 
-    sns.pointplot(y=y, x=x, hue=hue, data=data, capsize=.02,
-                  dodge=dodge, markers=markers)
+    markers = ['^', 'o', '+', 's', 'p', 'o', '8', 'D', 'x']
+    linestyles = ['-', '-', ':', '-.']
+    colors = ['k', 'b', 'g', 'y', 'r', 'm', 'y', 'w']
 
-    ax.set_xlabel(x_label, fontsize=18, weight='bold')
-    ax.set_ylabel(y_label, fontsize=18, weight='bold')
+    def cndCycler(cycler, std_marker, condition, data):
+        return [std_marker if condition(var) else cycler.next() for var in data]
 
-    # SAVE THE FIGURE
-    raise NotImplementedError
+    sns.pointplot(y='value', x='variable', hue='Class',
+                  order=order_cats,
+                  data=molten_scores,
+                  markers=cndCycler(cycle(markers[:-1]),
+                                    markers[-1],
+                                    lambda x: x in class_labels.values(),
+                                    molten_scores['Class'].unique()),
+                  linestyles=cndCycler(cycle(linestyles[:-1]), linestyles[-1],
+                                       lambda x: x in class_labels.values(),
+                                       molten_scores['Class'].unique()),
+                  palette=cndCycler(cycle(colors[1:]), colors[0],
+                                    lambda x: not x in class_labels.values(),
+                                    molten_scores['Class'].unique()),
+                  dodge=.5,
+                  scale=1.7,
+                  errwidth=2.2, capsize=.1, ax=ax)
+
+    leg_handles = ax.get_legend_handles_labels()[0]
+
+    ax.legend(handles=leg_handles,
+              ncol=6, mode="expand", borderaxespad=0., loc=3)
+    ax.set_xlabel(x_label, fontsize=1, weight='bold')
+    ax.set_title(title, fontsize=25,
+                 weight='bold')
+    ax.set_ylabel(y_label[0], fontsize=20, weight='bold')
+    ax.set_ylim([y_inf_lim, 1.0001])
+
+    plt.xticks(rotation=25, ha='right')
+
+    ax2 = ax.twinx()
+    ax2.set_ylabel(y_label[1], fontsize=20, weight='bold')
+    ax2.set_ylim([y_inf_lim, 1.0001])
+
+    return fig
 
 
 def plotLOFARgram(image,ax = None, filename = None):
@@ -130,7 +158,7 @@ def plotLOFARgram(image,ax = None, filename = None):
         plt.ylabel('Time (seconds)', fontweight='bold')
 
         if not filename is None:
-            plt.savefig(filename)
+            plt.savefig(filename, bbox_inches='tight')
             plt.close()
             return
 

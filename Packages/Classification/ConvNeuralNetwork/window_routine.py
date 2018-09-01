@@ -15,8 +15,9 @@ from sklearn.externals import joblib
 
 # Database caracteristics
 datapath = os.getenv('OUTPUTDATAPATH')
-
 audiodatapath = os.getenv('INPUTDATAPATH')
+results_path = os.getenv('PACKAGE_NAME')
+
 database = '4classes'
 n_pts_fft = 1024
 decimation_rate = 3
@@ -43,15 +44,16 @@ if ncv.exists():
 else:
     ncv.createCVs(data, trgt)
 
-if not exists(datapath + '/' + 'iter_2/window_run'):
-    mkdir(datapath + '/' 'iter_2/window_run')
+if not exists(results_path + '/' + 'iter_2/window_run'):
+    mkdir(results_path + '/' 'iter_2/window_run')
 
-window_grid = [10,20,30,40,50]
-image_stride = 10
-
+window_grid = [10, 20, 30, 40, 50, 60, 70, 80]
+stride_grid = [10]
+from itertools import product
+window_grid = list(product(window_grid, stride_grid))
 for cv_name, cv in ncv.cv.items():
-    for image_window in window_grid:
-        trnparams = TrnParamsConvolutional(prefix="convnet_run_slide",
+    for (image_window, im_stride) in window_grid:
+        trnparams = TrnParamsConvolutional(prefix="convnet/stride_%s" % im_stride,
                                            input_shape=(image_window, 400, 1), epochs=30,
                                            layers=[
                                                ["Conv2D", {"filters": 6,
@@ -78,7 +80,7 @@ for cv_name, cv in ncv.cv.items():
 
         def transform_fn(all_data, all_trgt, index_info, info):
             if info == 'train':
-                stride = image_stride
+                stride = im_stride
             else:
                 stride = image_window
             return lofar2image(all_data=all_data,

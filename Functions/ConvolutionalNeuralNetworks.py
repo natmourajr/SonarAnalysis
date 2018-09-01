@@ -320,7 +320,7 @@ class KerasModel(_CNNModel):
         """Returns the output of layer n of the model for the given data"""
 
         intermediate_layer_model = Model(inputs=self.model.input,
-                                         outputs=self.model.layers[n - 1].output)
+                                         outputs=self.model.layers[n].output)
         intermediate_output = intermediate_layer_model.predict(data)
         return intermediate_output
 

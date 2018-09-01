@@ -1508,7 +1508,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                   validation_data=(x_test, y_test[:, nv_mask]),
                                                   callbacks=[bestmodel, stopping],
                                                   class_weight=class_weights, verbose=verbose,
-                                                  max_restarts=4, restart_tol = 0.60)
+                                                  max_restarts=4, restart_tol=0.60)
 
             model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
             model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
@@ -1519,18 +1519,19 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                     [model_predictions[fold_count][:, :novelty_cls],
                      np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
                      model_predictions[fold_count][:, novelty_cls:],
-                     y_test],
+                     np.array(y_test.argmax(axis=1)[:,np.newaxis], dtype=np.int)],
+                    axis=1)
+            else:
+                model_predictions[fold_count] = np.concatenate(
+                    [model_predictions[fold_count],
+                     np.array(y_test.argmax(axis=1)[:, np.newaxis], dtype=np.int)],
                     axis=1)
 
             np.save(model.model_recovery_history, model_history)
             np.save(model.model_recovery_predictions, model_predictions)
 
-            tracker.print_diff()
-
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
-
-            #tracker.print_diff()
 
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
@@ -1545,15 +1546,22 @@ class ConvolutionTrainFunction(ConvolutionPaths):
     def _saveResults(model, model_results, novelty_classes, class_labels):
         history_ar = [history for history, _ in model_results]
         predictions_ar = [predictions for _, predictions in model_results]
-        # print [[[nv_cls], [range(predictions.shape[0])]]
-        #                   for nv_cls, prediction in zip(novelty_classes, predictions_ar)]
-        predictions_pd = [[pd.DataFrame(fold_prediction, columns=class_labels.values(),
-                                       index= pd.MultiIndex.from_product([['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
-                          for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in zip(novelty_classes, predictions_ar)]
+
+
+        column_names = class_labels.values()
+        column_names.append('Label')
+
+        predictions_pd = [[pd.DataFrame(fold_prediction, columns=column_names,
+                                        index=pd.MultiIndex.from_product(
+                                            [['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
+                           for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in
+                          zip(novelty_classes, predictions_ar)]
         history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
-                                            [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
-                           for i_fold, fold_history in enumerate(history)] for nv_cls, history in
-                          zip(novelty_classes, history_ar)]
+            [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
+                       for i_fold, fold_history in enumerate(history)] for nv_cls, history in
+                      zip(novelty_classes, history_ar)]
+
+
 
         pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
         pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])

@@ -255,6 +255,7 @@ class TrnParamsConvolutional(object):
 
         # Setting parameters --------------------------------------
         self.__dict__ = OrderedDict()
+        self.__dict__['input_shape'] = input_shape
         self.__dict__['prefix'] = prefix
         self.list2Optimizer(optimizer)
         self.list2layers(layers)
@@ -461,6 +462,9 @@ class _ParameterSet(object):
 
     def __iter__(self):
         return self.next()
+
+    def __len__(self):
+        return len(self.elements)
 
     def next(self):
         for element in self.elements:
