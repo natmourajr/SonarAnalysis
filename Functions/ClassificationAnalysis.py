@@ -602,6 +602,121 @@ class NeuralClassification(ClassificationBaseClass):
         # return K.mean(K.equal(trgt, K.lesser(output, threshold)))
 
 
+class CnnAnalysisFunction:
+    def __init__(self, ncv_obj, trnParamsMapping, package_name, analysis_name, class_labels):
+        self.modelsData = {model_name: ModelDataCollection(ncv_obj, trnParams, package_name,
+                                                           analysis_name + '/%s' % model_name,
+                                                           class_labels)
+                              for model_name, trnParams in trnParamsMapping.items()}
+        for model_name,cnn_an in self.modelsData.items():
+            print model_name
+            print cnn_an.params.input_shape
+
+        for modelData in self.modelsData.values():
+            modelData.fetchPredictions()
+            modelData.fecthHistory()
+
+        self.an_path = package_name + '/' + analysis_name
+        self.resultspath = package_name
+        self.class_labels = class_labels
+        self.scores = None
+        self.getScores()
+
+    def stdAnalysis(self, data, trgt):
+        for modelData in self.modelsData.values():
+            modelData.fetchPredictions()
+            modelData.fecthHistory()
+            modelData.plotConfusionMatrices()
+            modelData.plotTraining()
+            modelData.getScores()
+            modelData.plotDensities()
+            modelData.plotRuns(data, trgt, ["Conv2D"], overwrite=False)
+
+    def getScores(self):
+        scores = {model_name:cnn_an.getScores() for model_name, cnn_an in self.modelsData.items()}
+
+        for model_name in scores.keys():
+            scores[model_name]['Model'] = model_name
+
+        self.scores = pd.concat(scores, axis=0)
+
+    def plotScores(self):
+        markers = ['^', 'o', '+', 's', 'p', 'o', '8', 'D', 'x']
+        linestyles = ['-', '-', ':', '-.']
+        colors = ['k', 'b', 'g', 'y', 'r', 'm', 'y', 'w']
+
+        def cndCycler(cycler, std_marker, condition, data):
+            return [std_marker if condition(var) else cycler.next() for var in data]
+
+        for cv_name, cv_results in self.scores.groupby(level='CV'):
+            scorespath = self.an_path + '/%s.pdf' % cv_name
+
+            sns.set_style("whitegrid")
+
+            fig, ax = plt.subplots(figsize=(15, 8), nrows=1, ncols=1)
+
+            plt.rcParams['xtick.labelsize'] = 15
+            plt.rcParams['ytick.labelsize'] = 15
+            plt.rcParams['legend.numpoints'] = 1
+            plt.rc('legend', **{'fontsize': 15})
+            plt.rc('font', weight='bold')
+
+            cv_results = cv_results.melt(id_vars=['Model'])
+            sns.pointplot(y='value', x='Model', hue='variable',
+                          data=cv_results,
+                          markers=cndCycler(cycle(markers[:-1]),
+                                            markers[-1],
+                                            lambda x: x in ['Eff %s' % cls_name for cls_name in self.class_labels.values()],
+                                            cv_results['variable'].unique()),
+                          linestyles=cndCycler(cycle(linestyles[:-1]), linestyles[-1],
+                                               lambda x: x in ['Eff %s' % cls_name for cls_name in
+                                                               self.class_labels.values()],
+                                               cv_results['variable'].unique()),
+                          palette=cndCycler(cycle(colors[1:]), colors[0],
+                                            lambda x: not x in ['Eff %s' % cls_name for cls_name in
+                                                                self.class_labels.values()],
+                                            cv_results['variable'].unique()),
+                          dodge=.5,
+                          scale=1.7,
+                          errwidth=2.2, capsize=.1, ax=ax)
+            leg_handles = ax.get_legend_handles_labels()[0]
+            ax.legend(handles=leg_handles,
+                      ncol=6, mode="expand", borderaxespad=0., loc=3)
+            ax.set_xlabel("Window Quantity", fontsize=20, weight='bold')
+            # ax.set_ylabel('Figures of Merit', fontsize=20, weight='bold')
+            ax.set_title('Classification Efficiency for Different Window Quantities', fontsize=25, weight='bold')
+            plt.yticks(weight='bold', fontsize=16)
+            plt.xticks(ha='right', weight='bold', fontsize=16)
+            ax2 = ax.twinx()
+            ax.set_ylabel('Classification Efficiency', fontsize=20, weight='bold')
+            ax2.set_ylabel('SP index', fontsize=20, weight='bold')
+            ax2.set_ylim([.0, 1.0001])
+            ax.set_ylim([.0, 1.0001])
+            plt.yticks(weight='bold', fontsize=16)
+            fig.savefig(scorespath, bbox_inches='tight')
+            plt.close(fig)
+
+    def fetchPredictions(self):
+        raise NotImplementedError
+
+    def fetchHistory(self):
+        raise NotImplementedError
+
+    def plotConfusionMatrices(self):
+        raise NotImplementedError
+
+    def plotConfusionGrid(self):
+        raise NotImplementedError
+
+    def plotTraining(self):
+        raise NotImplementedError
+
+    def plotDensitise(self):
+        raise NotImplementedError
+
+    def plotRuns(self):
+        raise NotImplementedError
+
 class ModelDataCollection:
     def __init__(self, ncv_obj, trnParams, package_name, analysis_name, class_labels):
         self.n_cv = ncv_obj
@@ -614,6 +729,9 @@ class ModelDataCollection:
         self.class_labels = class_labels
         self.history = dict()
         self.predictions = dict()
+
+        if not exists(self.an_path):
+            mkdir(self.an_path)
 
     def fecthHistory(self, overwrite=False):
         collections_filepath = self.an_path + '/history_collection.jbl'

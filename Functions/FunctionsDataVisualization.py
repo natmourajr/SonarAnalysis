@@ -158,7 +158,7 @@ def plotLOFARgram(image,ax = None, filename = None):
         plt.ylabel('Time (seconds)', fontweight='bold')
 
         if not filename is None:
-            plt.savefig(filename)
+            plt.savefig(filename, bbox_inches='tight')
             plt.close()
             return
 
