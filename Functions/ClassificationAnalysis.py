@@ -867,7 +867,7 @@ class ModelDataCollection:
 
                 loss_ax.set_ylabel('Loss', fontsize=20, weight='bold')
 
-                fig.savefig(losspath + '/%s' % i_fold)
+                fig.savefig(losspath + '/%s.pdf' % i_fold)
                 plt.close(fig)
 
     def getScores(self):
@@ -932,7 +932,7 @@ class ModelDataCollection:
 
                     axes[i,0].set_title(class_labels[i], fontsize = 15)
                     axes[0,i].set_ylabel(class_labels[i], fontsize = 15)
-                fig.savefig(densitypath + '/%s' % fold_name, bbox_inches='tight')
+                fig.savefig(densitypath + '/%s.pdf' % fold_name, bbox_inches='tight')
                 plt.close(fig)
 
     def plotRuns(self, data, trgt, layers_id, overwrite=False):
@@ -973,7 +973,7 @@ class ModelDataCollection:
                                     #           "set overwrite to True. Exiting." % (layer.identifier, n)
                                     #     break
 
-                                plotLOFARgram(channel, filename=outpath + '/%s' % ship_name)
+                                plotLOFARgram(channel, filename=outpath + '/%s.pdf' % ship_name)
 
 
 
