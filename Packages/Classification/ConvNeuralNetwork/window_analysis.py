@@ -4,7 +4,7 @@ from sklearn.externals import joblib
 from Functions.CrossValidation import NestedCV
 from Functions.TrainParameters import TrnParamsConvolutional
 from Functions.TrainFunctions import ConvolutionTrainFunction
-from Functions.ClassificationAnalysis import ModelDataCollection, CnnAnalysisFunction
+from Functions.ClassificationAnalysis import ModelDataCollection, CnnClassificationAnalysis
 
 # Database caracteristics
 datapath = os.getenv('OUTPUTDATAPATH')
@@ -100,7 +100,10 @@ for (image_window, im_stride) in window_grid:
 
     param_mapping[str(image_window)] = trnparams
 
-all_an = CnnAnalysisFunction(ncv, param_mapping, package_name, 'test_an', class_labels)
+    model = ModelDataCollection(ncv, trnparams, package_name, 'iter_2/window_analysis/%i' % image_window, class_labels)
+    #model._reconstructPredictions(data, trgt, image_window)
+
+all_an = CnnClassificationAnalysis(ncv, param_mapping, package_name, 'iter_2/window_analysis', class_labels)
 all_an.plotScores()
 
 

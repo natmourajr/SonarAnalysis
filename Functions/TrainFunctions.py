@@ -1471,7 +1471,11 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 x_train, y_train = preprocessing_fn(x_train, y_train)
                 x_test, y_test = preprocessing_fn(x_test, y_test)
 
+            # x_train = x_train[::100]
+            # y_train = y_train[::100]
+
             x_train = x_train[y_train != novelty_cls]
+            x_test_nv = x_test
             x_test = x_test[y_test != novelty_cls]
 
             y_train = y_train[y_train != novelty_cls]
@@ -1513,7 +1517,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
             model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
 
-            model_predictions[fold_count] = model.predict(x_test)
+            model_predictions[fold_count] = model.predict(x_test_nv)
             if not novelty_cls is None:
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count][:, :novelty_cls],
