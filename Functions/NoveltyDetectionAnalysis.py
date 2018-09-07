@@ -26,7 +26,7 @@ from Functions.ClassificationAnalysis import CnnClassificationAnalysis
 from Functions.ConvolutionalNeuralNetworks import KerasModel
 from Functions.CrossValidation import SonarRunsKFold
 from Functions.NpUtils.DataTransformation import lofar2image
-from Functions.NpUtils.Scores import trigger_score, recall_score
+from Functions.NpUtils.Scores import trigger_score, recall_score, spIndex
 from Functions.SystemIO import exists, mkdir
 
 plt.rcParams['xtick.labelsize'] = 15
@@ -690,6 +690,54 @@ class CnnNoveltyAnalysis(object):
                     trigger_zoom = trigger_zoom.append(trigger_stats_zoom)
         return trigger, trigger_zoom
 
+    def _iterSpRate(self, v_res):
+        threshold_pd, threshold_pd_zoom, threshold_values, threshold_values_zoom = self._getThresGrid(v_res)
+
+        trigger= pd.DataFrame()
+        trigger_zoom = pd.DataFrame()
+
+        for (model_name, model_thres), (_, model_thres_zoom) in zip(threshold_pd.groupby(by='Model'),
+                                                                    threshold_pd_zoom.groupby(by='Model')):
+            for (cv_name, cv_thres), (_, cv_thres_zoom) in zip(model_thres.groupby(by='CV'),
+                                                               model_thres_zoom.groupby(by='CV')):
+                for (novelty_cls, folds_thresh_pd), (_, folds_thresh_pd_zoom) \
+                        in zip(cv_thres.groupby(by='Novelty'),
+                               cv_thres_zoom.groupby(by='Novelty')):
+
+                    known_cls = [value for value in self.class_labels.keys() if value != novelty_cls]
+
+                    recall_tensor = [np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
+                                              .apply(lambda x: recall_score(group['Label']
+                                                                            .values, x.values)[cls], axis=0)
+                                               for name, group in folds_thresh_pd.groupby(level='Fold')])
+                                     for cls in known_cls]
+
+                    recall_tensor_zoom = [np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
+                                                   .apply(lambda x: recall_score(group['Label']
+                                                                                 .values, x.values)[cls], axis=0)
+                                                    for name, group in folds_thresh_pd_zoom.groupby(level='Fold')])
+                                          for cls in known_cls]
+
+                    trigger_matrix = np.apply_along_axis(lambda x: spIndex(x, 3), 0, np.array(recall_tensor))
+                    trigger_matrix_zoom = np.apply_along_axis(lambda x: spIndex(x, 3), 0, np.array(recall_tensor_zoom))
+
+
+                    trigger_stats = pd.DataFrame({'mean': trigger_matrix.mean(axis=0),
+                                             'std': trigger_matrix.std(axis=0)})
+                    trigger_stats_zoom = pd.DataFrame({'mean': trigger_matrix_zoom.mean(axis=0),
+                                                  'std': trigger_matrix_zoom.std(axis=0)})
+
+                    trigger_stats['Model'] = model_name
+                    trigger_stats['CV'] = cv_name
+                    trigger_stats['Novelty'] = novelty_cls
+                    trigger_stats_zoom['Model'] = model_name
+                    trigger_stats_zoom['CV'] = cv_name
+                    trigger_stats_zoom['Novelty'] = novelty_cls
+
+                    trigger = trigger.append(trigger_stats)
+                    trigger_zoom = trigger_zoom.append(trigger_stats_zoom)
+        return trigger, trigger_zoom
+
     def plotTriggerNvRate(self, v_res):
         colors = {0: 'b', 1: 'g', 2: 'y', 3: 'r'}
         linst = {0: '-', 1: ':', 2: '-.', 3: '--'}
@@ -744,7 +792,6 @@ class CnnNoveltyAnalysis(object):
                 if not exists(savepath):
                     mkdir(savepath)
                 roc_fig.savefig(savepath + 'nv_t_trigger_%i.pdf' % novelty_cls)
-
 
 
     def getAUC(self, v_res):
@@ -827,7 +874,52 @@ class CnnNoveltyAnalysis(object):
 
         print trigger_auc
 
-    def getQuantiles(self, v_res):
+    def getSpOp(self, v_res):
+        trigger, trigger_zoom = self._iterSpRate(v_res)
+        nv_rate, nv_rate_zoom = self._iterNvRate(v_res)
+
+        def mask(df, key, value):
+            return df.loc[df[key] == value]
+
+        pd.DataFrame.mask = mask
+        for (novelty_cls, nv_trigger) in trigger.groupby(by='Novelty'):
+            for (model_name, model_trigger) in nv_trigger.groupby(by='Model'):
+                for cv_name, trigger_stats in model_trigger.groupby(by='CV'):
+
+                    trigger_stats_zoom = trigger_zoom.mask('Model', model_name) \
+                        .mask('CV', cv_name) \
+                        .mask('Novelty', novelty_cls)
+
+                    nv_rate_stats = nv_rate.mask('Model', model_name) \
+                        .mask('CV', cv_name) \
+                        .mask('Novelty', novelty_cls)
+
+                    nv_rate_stats_zoom = nv_rate_zoom.mask('Model', model_name) \
+                        .mask('CV', cv_name) \
+                        .mask('Novelty', novelty_cls)
+                    print model_name
+                    print  novelty_cls
+                    for v in [0.0, 0.5]:
+                        self.trigger_zero = trigger_stats['mean'][nv_rate_stats['mean'] <= v].values
+                        self.nv_rate_stats = nv_rate_stats
+                        lin_mean = (trigger_stats['mean'][nv_rate_stats['mean'].values > v].values[0] +
+                                    trigger_stats['mean'][nv_rate_stats['mean'].values <= v].values[-1]) / 2
+                        lin_std = (trigger_stats['std'][nv_rate_stats['mean'].values > v].values[0] +
+                                   trigger_stats['std'][nv_rate_stats['mean'].values <= v].values[-1]) / 2
+                        # print trigger_stats
+                        print trigger_stats['mean'][nv_rate_stats['mean'].values <= v]
+                        print trigger_stats['std'][nv_rate_stats['mean'].values <= v]
+                        print '\t%.2f:\t ' % v + \
+                              '%f +- %f' % (lin_mean, lin_std)
+                    for v in [0.75]:
+                        lin_mean = (trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values > v].values[0] +
+                                    trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values <= v].values[-1]) / 2
+                        lin_std = (trigger_stats_zoom['std'][nv_rate_stats_zoom['mean'].values > v].values[0] +
+                                   trigger_stats_zoom['std'][nv_rate_stats_zoom['mean'].values <= v].values[-1]) / 2
+                        print '\t%.2f:\t ' % v + \
+                              '%f +- %f' % (lin_mean, lin_std)
+
+    def getTriggerOp(self, v_res):
         trigger, trigger_zoom = self._iterTriggerRate(v_res)
         nv_rate, nv_rate_zoom = self._iterNvRate(v_res)
 
@@ -947,6 +1039,84 @@ class CnnNoveltyAnalysis(object):
                                 bbox_inches='tight')
                     plt.close(fig)
 
+    def plotSPThresholds(self, v_res):
+        colors = {0: 'b', 1: 'g', 2: 'y', 3: 'r'}
+        linst = {0: '-', 1: ':', 2: '-.', 3: '--'}
+        threshold_pd, threshold_pd_zoom, threshold_values, threshold_values_zoom = self._getThresGrid(v_res)
+
+        trigger, trigger_zoom = self._iterSpRate(v_res)
+        nv_rate, nv_rate_zoom = self._iterNvRate(v_res)
+        def mask(df, key, value):
+            return df.loc[df[key] == value]
+
+        pd.DataFrame.mask = mask
+        for (novelty_cls, nv_trigger) in trigger.groupby(by='Novelty'):
+            for (model_name, model_trigger) in nv_trigger.groupby(by='Model'):
+                for cv_name, cv_trigger in model_trigger.groupby(by='CV'):
+
+                    cv_trigger_zoom = trigger_zoom.mask('Model', model_name)\
+                        .mask('CV', cv_name)\
+                        .mask('Novelty', novelty_cls)
+
+                    cv_nv_rate = nv_rate.mask('Model', model_name)\
+                        .mask('CV', cv_name)\
+                        .mask('Novelty', novelty_cls)
+
+
+                    cv_nv_rate_zoom = nv_rate_zoom.mask('Model', model_name)\
+                        .mask('CV', cv_name)\
+                        .mask('Novelty', novelty_cls)
+
+                    fig = plt.figure(figsize=(6, 6))
+                    nv_ax = plt.gca()
+                    sp_ax = nv_ax.twinx()
+
+                    sp_ax.plot(threshold_values, cv_trigger['mean'].values, color='black')
+                    sp_ax.fill_between(threshold_values, cv_trigger['mean'] + cv_trigger['std'],
+                                       cv_trigger['mean'] - cv_trigger ['std'], color='black',
+                                       alpha=0.3, label='SP index')
+
+                    nv_ax.plot(threshold_values, cv_nv_rate['mean'].values, color='crimson', linestyle=':')
+                    nv_ax.fill_between(threshold_values, cv_nv_rate['mean'] + cv_nv_rate['std'],
+                                       cv_nv_rate['mean'] - cv_nv_rate['std'],
+                                       alpha=0.3, color='crimson', label='Novelty rate')
+                    nv_ax.set_ylabel('Novelty rate', fontsize=15)
+                    sp_ax.set_ylabel('SP index', fontsize=15)
+                    nv_ax.set_xlabel('Threshold', fontsize=15)
+
+                    for ax in [nv_ax, sp_ax]:
+                        ax.set_ylim(0, 1.12)
+
+                    plt.title('Novelty detection for %s' % self.class_labels[novelty_cls], fontsize=18)
+                    lines, labels = nv_ax.get_legend_handles_labels()
+                    lines2, labels2 = sp_ax.get_legend_handles_labels()
+                    nv_ax.legend(lines + lines2, labels + labels2, loc='upper left', ncol=2)
+
+                    ax2 = plt.axes([0.22, 0.33, 0.50, 0.35])
+
+                    ax2.plot(threshold_values_zoom, cv_trigger_zoom['mean'].values, color='black')
+                    ax2.fill_between(threshold_values_zoom,
+                                     cv_trigger_zoom['mean'] + cv_trigger_zoom['std'],
+                                     cv_trigger_zoom['mean'] - cv_trigger_zoom['std'],
+                                     color='black',
+                                     alpha=0.3)
+
+                    ax2.plot(threshold_values_zoom, cv_nv_rate_zoom['mean'].values, color='crimson', linestyle=':')
+                    ax2.fill_between(threshold_values_zoom, cv_nv_rate_zoom['mean'] + cv_nv_rate_zoom['std'],
+                                     cv_nv_rate_zoom['mean'] - cv_nv_rate_zoom['std'],
+                                     color='crimson', alpha=0.3)
+                    ax2.set_xlim(0.95, 1)
+                    ax2.set_ylim(.2, 1)
+
+                    savepath = self.an_path + '/%s/%s/' % (model_name, cv_name)
+                    if not exists(savepath):
+                        mkdir(savepath)
+                    plt.savefig(savepath + 'nv_t_sp_%i.pdf' % novelty_cls,
+                                bbox_inches='tight')
+                    plt.savefig(savepath + 'nv_t_sp_%i.png' % novelty_cls,
+                                bbox_inches='tight')
+                    plt.close(fig)
+
 
     # def plotTriggerThresholds(self, v_res):
     #     colors = {0: 'b', 1: 'g', 2: 'y', 3: 'r'}
@@ -1042,10 +1212,6 @@ class CnnNoveltyAnalysis(object):
     #                 plt.savefig(savepath + 'nv_t_trigger_%i.pdf' % novelty_cls,
     #                             bbox_inches='tight')
     #                 plt.close(fig)
-
-
-    def plotSPThresholds(self):
-        raise NotImplementedError
 
     def plotEffThresholds(self):
         raise NotImplementedError
