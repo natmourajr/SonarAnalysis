@@ -627,7 +627,7 @@ class CnnClassificationAnalysis:
             modelData.plotTraining()
             modelData.getScores()
             modelData.plotDensities()
-            modelData.plotRuns(data, trgt, ["Conv2D"], overwrite=False)
+            modelData.plotLayerOutputs(data, trgt, ["Conv2D"], overwrite=False)
 
     def getScores(self):
         scores = {model_name:cnn_an.getScores() for model_name, cnn_an in self.modelsData.items()}
@@ -702,8 +702,9 @@ class CnnClassificationAnalysis:
     def plotTraining(self):
         raise NotImplementedError
 
-    def plotDensities(self, color_matrix=None):
-        raise NotImplementedError
+    def plotDensities(self):
+        for modelData in self.modelsData.values():
+            modelData.plotDensities()
 
     def plotRuns(self):
         raise NotImplementedError
@@ -893,44 +894,48 @@ class ModelDataCollection:
         model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs], axis=0)
         return model_scores
 
-    def plotDensities(self, bins=50, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False, color_matrix = None):
+    def plotDensities(self, bins=50, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
         class_labels = self.class_labels
         for cv_name, cv in self.n_cv.cv.items():
             densitypath = self.an_path + '/%s/densities/' % cv_name
             sns.set_style("whitegrid")
 
-            if not exists(densitypath):
-                mkdir(densitypath)
-            else:
-                if not overwrite:
-                    print "Densities already plotted. For overwriting current plots, " \
-                          "set overwrite to True. Exiting."
-                    return
+            # if not exists(densitypath):
+            #     mkdir(densitypath)
+            # else:
+            #     if not overwrite:
+            #         print "Densities already plotted. For overwriting current plots, " \
+            #               "set overwrite to True. Exiting."
+            #         return
 
             plt.style.use('seaborn-whitegrid')
             predictions = self.predictions[cv_name]
-            n_outputs = len(predictions) - 1  # Number of output columns (all minus the Label column)
+            nv_class = [class_labels[i_cls] for i_cls, output_column in enumerate(predictions.filter(regex=('Class*'))) if
+                        pd.isnull(predictions[output_column]).all()][0]
+            predictions.drop(columns=nv_class, inplace=True)
+
+            n_outputs = predictions.filter(regex=('Class*')).shape[1] # Number of output columns (all minus the Label column)
             n_classes = np.unique(predictions['Label'].values).shape[0]
 
+            inverted_labels = {value: key for key, value in class_labels.items()}
             for fold_name, fold_prediction in predictions.groupby(level='Fold'):
                 fig = plt.figure(figsize=(15, 8))
-                grid = plt.GridSpec(n_outputs, n_classes, hspace=hspace,wspace=wspace)
-                if color_matrix is None:
-                    colors = ['b', 'r', 'g', 'y']
-                    colors = np.repeat(colors, axis=1)
-                else:
-                    colors = color_matrix
+                grid = plt.GridSpec(n_classes, n_outputs, hspace=hspace,wspace=wspace)
+                colors = ['b', 'r', 'g', 'y']
+                if nv_class:
+                    colors[inverted_labels[nv_class]] = 'k'
+
                 axes = np.array([[fig.add_subplot(grid[i, j])
-                                 for i in range(0, n_classes)]
-                                 for j in range(0, n_outputs)])
+                                 for j in range(0, n_outputs)]
+                                 for i in range(0, n_classes)])
                 for correct_label, cls_predictions in fold_prediction.groupby(by='Label'):
-                    for pred_i, pred_label in enumerate(cls_predictions.drop(columns=['Label'])):
-                        i, j = pred_i, int(correct_label)
+                    for pred_i, pred_label in enumerate(cls_predictions.filter(regex=('Class*'))):
+                        i, j = int(correct_label), pred_i
                         network_output = cls_predictions[pred_label].values  # Output for the predicted class
                         weights = np.zeros_like(network_output) + 1. / network_output.shape[0]  # Normalize bins
                         axes[i, j].hist(cls_predictions[pred_label].values,
                                         bins=bins,
-                                        color=colors[i][j],
+                                        color=colors[i],
                                         weights=weights,
                                         histtype='stepfilled',
                                         alpha = .6)
@@ -940,12 +945,57 @@ class ModelDataCollection:
                         for tick in axes[i,j].get_xticklabels():
                             tick.set_rotation(xtick_rotation)
 
-                    axes[i,0].set_title(class_labels[i], fontsize = 15)
-                    axes[0,i].set_ylabel(class_labels[i], fontsize = 15)
+                        axes[0,j].set_title(class_labels[inverted_labels[pred_label]], fontsize = 15)
+                        axes[i,0].set_ylabel(class_labels[i], fontsize = 15)
                 fig.savefig(densitypath + '/%s.pdf' % fold_name, bbox_inches='tight')
                 plt.close(fig)
 
-    def plotRuns(self, data, trgt, layers_id, overwrite=False):
+    def plotRunsPredictions(self, data, trgt, overwrite=False):
+        k_model = KerasModel(self.params)
+        window_size = self.params.input_shape[0]
+        for cv_name, cv in self.n_cv.cv.items():
+            k_model.selectFoldConfig(10, mode=cv_name)
+
+            outputpath = self.an_path + '/%s/outputs/pred_maps' % (cv_name)
+
+            for i_fold, (_, test_index) in enumerate(cv):
+                k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
+
+                x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
+
+                p_test = k_model.predict(x_test).argmax(axis=1)
+                for cls_i, cls_str in self.class_labels.items():
+                    run = x_test[y_test == cls_i]
+                    run_trgt = y_test[y_test == cls_i]
+                    run_p = p_test[y_test == cls_i]
+
+                    # TODO pass this to NestedCV and recover here as an attribute
+                    ship_name = [ship_name
+                                 for ship_name, ship_indices in self.n_cv.info.runs_named[cls_str].items()
+                                 if np.isin(test_index, ship_indices).any()]
+                    fig = plt.figure(figsize=(10,10))
+                    ax = plt.gca()
+
+                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+
+                    mask = np.concatenate([np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
+                                           for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
+
+                    ax.imshow(mask[:, :, 0], alpha=.4, cmap=plt.get_cmap('coolwarm_r', 2),
+                              extent=[1, mask.shape[1], mask.shape[0], 1],
+                              aspect="auto")
+
+                    filepath = outputpath + '/%s' % cls_str
+                    if not exists(filepath):
+                        mkdir(filepath)
+                    else:
+                        pass
+
+                    fig.savefig(filepath + '/%i_fold_%s' % (i_fold, ship_name))
+                    plt.cla()
+                    plt.close(fig)
+
+    def plotLayerOutputs(self, data, trgt, layers_id, overwrite=False):
         def reconstructRun(input, n_layer):
             return k_model.get_layer_n_output(n_layer, input)
 
@@ -961,7 +1011,6 @@ class ModelDataCollection:
                         k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
 
                         x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
-
                         for cls_i, cls_str in self.class_labels.items():
                             run = x_test[y_test == cls_i]
 
@@ -982,8 +1031,8 @@ class ModelDataCollection:
                                     #     print "Layer %s_%i output already plotted. For overwriting current plots, " \
                                     #           "set overwrite to True. Exiting." % (layer.identifier, n)
                                     #     break
-
-                                plotLOFARgram(channel, filename=outpath + '/%s.pdf' % ship_name)
+                                print 'hey'
+                                plotLOFARgram(channel, filename=outpath + '/%i_fold_%s.pdf' % (i_fold, ship_name))
 
     def _reconstructPredictions(self, data, trgt, image_window):
         """Retro-compatibility function. Used to update prediction files old storage format to the new one"""

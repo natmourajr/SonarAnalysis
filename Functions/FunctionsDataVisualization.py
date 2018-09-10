@@ -137,7 +137,7 @@ def plotScores(scores_dataframe,
     return fig
 
 
-def plotLOFARgram(image,ax = None, filename = None):
+def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True):
     """Plot LOFARgram from an array of frequency spectre values
 
     Args:
@@ -151,7 +151,7 @@ def plotLOFARgram(image,ax = None, filename = None):
         plt.rcParams['ytick.labelsize'] = 30
 
         plt.imshow(image,
-                   cmap="jet", extent=[1, image.shape[1], image.shape[0], 1],
+                   cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
                    aspect="auto")
 
         plt.xlabel('Frequency bins', fontweight='bold')
@@ -165,8 +165,10 @@ def plotLOFARgram(image,ax = None, filename = None):
         return fig
     else:
         x = ax.imshow(image,
-                   cmap="jet", extent=[1, 400, image.shape[0], 1],
+                   cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
                    aspect="auto")
-        plt.colorbar(x, ax = ax)
+        if colorbar:
+            plt.colorbar(x, ax=ax)
         return
+
 

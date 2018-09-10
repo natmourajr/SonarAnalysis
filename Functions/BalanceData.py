@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.cluster import KMeans
+import numpy.random as np_rnd
 
 class DataCreator(object):
     def __init__(self):
@@ -25,4 +26,4 @@ class DataCreator(object):
             if qtd_events == 0:
                 continue
             select_data = data[output==icenter,:]
-            return select_data [np.random.randint(0, select_data.shape[0]-1, size=qtd_events),:] 
+            return select_data [np.random.randint(0, select_data.shape[0]-1, size=qtd_events),:]

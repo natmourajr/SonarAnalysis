@@ -645,7 +645,6 @@ class CnnNoveltyAnalysis(object):
                     nv_scores_zoom = nv_scores_zoom.append(nv_rate_stats_zoom)
         return nv_scores, nv_scores_zoom
 
-
     def _iterTriggerRate(self, v_res):
         threshold_pd, threshold_pd_zoom, threshold_values, threshold_values_zoom = self._getThresGrid(v_res)
 
@@ -672,7 +671,6 @@ class CnnNoveltyAnalysis(object):
                         [group.drop(columns=['Novelty', 'CV', 'Model', 'Label']).apply(lambda x: trigger_score(group['Label'].values,
                                                                                                       x.values, novelty_cls), axis=0)
                          for name, group in folds_thresh_pd_zoom.groupby(level='Fold')])
-
 
                     trigger_stats = pd.DataFrame({'mean': trigger_matrix.mean(axis=0),
                                              'std': trigger_matrix.std(axis=0)})
@@ -745,36 +743,16 @@ class CnnNoveltyAnalysis(object):
 
         trigger, trigger_zoom = self._iterTriggerRate(v_res)
         nv_rate, nv_rate_zoom = self._iterNvRate(v_res)
+
         def mask(df, key, value):
             return df.loc[df[key] == value]
-
         pd.DataFrame.mask = mask
-
 
         for (novelty_cls, nv_trigger) in trigger.groupby(by='Novelty'):
             for cv_name, cv_trigger in nv_trigger.groupby(by='CV'):
                 roc_fig = plt.figure(figsize=(6, 6))
                 roc_ax = plt.gca()
                 for i, (model_name, model_trigger) in enumerate(cv_trigger.groupby(by='Model')):
-                    # model_nv_rate = nv_rate.mask('CV', cv_name) \
-                    #     .mask('Novelty', novelty_cls)\
-                    #     .mask('Model', model_name)
-                    #
-                    # model_trigger_zoom = trigger_zoom.mask('CV', cv_name) \
-                    #     .mask('Novelty', novelty_cls)\
-                    #     .mask('Model', model_name)
-                    #
-                    # model_nv_rate_zoom = nv_rate_zoom.mask('CV', cv_name) \
-                    #     .mask('Novelty', novelty_cls)\
-                    #     .mask('Model', model_name)
-                    #
-                    # x = np.concatenate([threshold_values[threshold_values < 0.95],
-                    #                         threshold_values_zoom])
-                    # trigger_y = np.hstack([model_trigger[:, threshold_values < 0.95],
-                    #                        model_trigger_zoom[:, :]])
-                    # nv_y = np.hstack([model_nv_rate[:, threshold_values < 0.95],
-                    #                       model_nv_rate_zoom[:, :]])
-
                     roc_ax.set_title('Trigger x Novelty rate', fontsize=18)
 
                     roc_ax.plot(model_nv_rate['mean'].values, model_trigger['mean'].values, color=colors.values()[i],
@@ -793,12 +771,9 @@ class CnnNoveltyAnalysis(object):
                     mkdir(savepath)
                 roc_fig.savefig(savepath + 'nv_t_trigger_%i.pdf' % novelty_cls)
 
-
     def getAUC(self, v_res):
         threshold_pd, threshold_pd_zoom, threshold_values, threshold_values_zoom = self._getThresGrid(v_res)
 
-        trigger = pd.DataFrame()
-        trigger_zoom = pd.DataFrame()
         trigger_auc = pd.DataFrame(columns=['mean', 'std'])
         nv_pd_auc = pd.DataFrame(columns=['mean', 'std'])
 
@@ -1117,113 +1092,15 @@ class CnnNoveltyAnalysis(object):
                                 bbox_inches='tight')
                     plt.close(fig)
 
-
-    # def plotTriggerThresholds(self, v_res):
-    #     colors = {0: 'b', 1: 'g', 2: 'y', 3: 'r'}
-    #     linst = {0: '-', 1: ':', 2: '-.', 3: '--'}
-    #     threshold_pd, threshold_pd_zoom, threshold_values, threshold_values_zoom = self._getThresGrid(v_res)
-    #
-    #     for (model_name, model_thres), (_, model_thres_zoom) in zip(threshold_pd.groupby(by='Model'),
-    #                                                                 threshold_pd_zoom.groupby(by='Model')):
-    #         for (cv_name, cv_thres), (_, cv_thres_zoom) in zip(model_thres.groupby(by='CV'),
-    #                                                            model_thres_zoom.groupby(by='CV')):
-    #             for (novelty_cls, folds_thresh_pd), (_, folds_thresh_pd_zoom) \
-    #                     in zip(cv_thres.groupby(by='Novelty'),
-    #                            cv_thres_zoom.groupby(by='Novelty')):
-    #
-    #                 known_cls = [value for value in self.class_labels.keys() if value != novelty_cls]
-    #
-    #                 trigger_matrix = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
-    #                                           .apply(lambda x: trigger_score(group['Label'].values,
-    #                                                                          x.values, novelty_cls),
-    #                                                  axis=0)
-    #                                            for name, group in folds_thresh_pd.groupby(level='Fold')])
-    #
-    #                 trigger_matrix_zoom = np.array(
-    #                     [group.drop(columns=['Novelty', 'CV', 'Model', 'Label']).apply(lambda x: trigger_score(group['Label'].values,
-    #                                                                                                   x.values, novelty_cls), axis=0)
-    #                      for name, group in folds_thresh_pd_zoom.groupby(level='Fold')])
-    #
-    #
-    #                 nv_rate_matrix = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
-    #                                           .apply(lambda x: recall_score(group['Label'].values,
-    #                                                                         x.values)[novelty_cls], axis=0)
-    #                                            for name, group in folds_thresh_pd.groupby(level='Fold')])
-    #
-    #                 nv_rate_matrix_zoom = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
-    #                                                .apply(lambda x: recall_score(group['Label']
-    #                                                                              .values, x.values)[novelty_cls], axis=0)
-    #                                                 for name, group in folds_thresh_pd_zoom.groupby(level='Fold')])
-    #
-    #                 nv_rate_stats = pd.DataFrame({'mean': nv_rate_matrix.mean(axis=0),
-    #                                               'std': nv_rate_matrix.std(axis=0)})
-    #                 nv_rate_stats_zoom = pd.DataFrame({'mean': nv_rate_matrix_zoom.mean(axis=0),
-    #                                                    'std': nv_rate_matrix_zoom.std(axis=0)})
-    #
-    #                 sp_stats = pd.DataFrame({'mean': trigger_matrix.mean(axis=0),
-    #                                          'std': trigger_matrix.std(axis=0)})
-    #                 sp_stats_zoom = pd.DataFrame({'mean': trigger_matrix_zoom.mean(axis=0),
-    #                                               'std': trigger_matrix_zoom.std(axis=0)})
-    #
-    #                 fig = plt.figure(figsize=(6, 6))
-    #                 nv_ax = plt.gca()
-    #                 sp_ax = nv_ax.twinx()
-    #
-    #                 sp_ax.plot(threshold_values, sp_stats['mean'].values, color='black')
-    #                 sp_ax.fill_between(threshold_values, sp_stats['mean'] + sp_stats['std'],
-    #                                    sp_stats['mean'] - sp_stats['std'], color='black',
-    #                                    alpha=0.3, label='Trigger')
-    #
-    #                 nv_ax.plot(threshold_values, nv_rate_stats['mean'].values, color='indigo', linestyle=':')
-    #                 nv_ax.fill_between(threshold_values, nv_rate_stats['mean'] + nv_rate_stats['std'],
-    #                                    nv_rate_stats['mean'] - nv_rate_stats['std'],
-    #                                    alpha=0.3, color='indigo', label='Novelty rate')
-    #                 nv_ax.set_ylabel('Novelty rate', fontsize=15)
-    #                 sp_ax.set_ylabel('SP index', fontsize=15)
-    #                 nv_ax.set_xlabel('Threshold', fontsize=15)
-    #
-    #                 for ax in [nv_ax, sp_ax]:
-    #                     ax.set_ylim(0, 1.08)
-    #
-    #                 plt.title('Novelty detection for %s' % self.class_labels[novelty_cls], fontsize=18)
-    #                 lines, labels = nv_ax.get_legend_handles_labels()
-    #                 lines2, labels2 = sp_ax.get_legend_handles_labels()
-    #                 nv_ax.legend(lines + lines2, labels + labels2, loc='upper left', ncol=2)
-    #
-    #                 ax2 = plt.axes([0.22, 0.33, 0.50, 0.35])
-    #
-    #                 ax2.plot(threshold_values_zoom, sp_stats_zoom['mean'].values, color='black')
-    #                 ax2.fill_between(threshold_values_zoom,
-    #                                  sp_stats_zoom['mean'] + sp_stats_zoom['std'],
-    #                                  sp_stats_zoom['mean'] - sp_stats_zoom['std'],
-    #                                  color='black',
-    #                                  alpha=0.3)
-    #
-    #                 ax2.plot(threshold_values_zoom, nv_rate_stats_zoom['mean'].values, color='indigo', linestyle=':')
-    #                 ax2.fill_between(threshold_values_zoom, nv_rate_stats_zoom['mean'] + nv_rate_stats_zoom['std'],
-    #                                  nv_rate_stats_zoom['mean'] - nv_rate_stats_zoom['std'],
-    #                                  color='indigo', alpha=0.3)
-    #                 ax2.set_xlim(0.95, 1)
-    #                 ax2.set_ylim(.2, 1)
-    #
-    #                 savepath = self.an_path + '/%s/%s/' % (model_name, cv_name)
-    #                 if not exists(savepath):
-    #                     mkdir(savepath)
-    #                 plt.savefig(savepath + 'nv_t_trigger_%i.pdf' % novelty_cls,
-    #                             bbox_inches='tight')
-    #                 plt.close(fig)
-
     def plotEffThresholds(self):
         raise NotImplementedError
 
     def plotDensities(self):
-        colors = ['b', 'r', 'g', 'y']
-        colors = np.repeat(colors, axis=1)
+        colors = np.array(['b', 'r', 'g', 'y'])
+        colors = np.repeat(colors[:,np.newaxis], 3, axis=1)
 
         class_indices = {value: key for key, value in self.class_labels.items()}
-        for nv_cls, modelAnalysis in self.ModelsAnalysis.items():
-            i_cls = class_indices[nv_cls]
-            colors[i_cls, :] = 'k'
-            modelAnalysis.plotDensities(color_matrix = colors)
+        for modelAnalysis in self.ModelsAnalysis.values():
+            modelAnalysis.plotDensities()
 
 

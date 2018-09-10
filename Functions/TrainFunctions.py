@@ -1424,7 +1424,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                transform_fn,
                                                preprocessing_fn,
                                                novelty_cls=cls,
-                                               verbose=verbose[1]),
+                                               verbose=verbose[1],
+                                               fold_balance=fold_balance),
                     novelty_classes),
                 dtype=object)
 
@@ -1436,7 +1437,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 end - start, (end - start) / 60, (end - start) / 3600)
 
     def _fitModel(self, model, data, trgt, class_labels, transform_fn, preprocessing_fn=None, novelty_cls=None,
-                  verbose=False):
+                  verbose=False, fold_balance = None):
         # from pympler.tracker import SummaryTracker
         # tracker = SummaryTracker()
 
@@ -1471,9 +1472,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 x_train, y_train = preprocessing_fn(x_train, y_train)
                 x_test, y_test = preprocessing_fn(x_test, y_test)
 
-            # x_train = x_train[::100]
-            # y_train = y_train[::100]
-
             x_train = x_train[y_train != novelty_cls]
             x_test_nv = x_test
             x_test = x_test[y_test != novelty_cls]
@@ -1481,7 +1479,10 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             y_train = y_train[y_train != novelty_cls]
             y_test = y_test[y_test != novelty_cls]
 
-            class_weights = self._getGradientWeights(y_train, mode='standard', novelty_cls=novelty_cls)
+            if fold_balance == 'class_weights':
+                class_weights = self._getGradientWeights(y_train, mode='standard', novelty_cls=novelty_cls)
+            else:
+                class_weights = None
 
             y_test = Functions.NpUtils.DataTransformation.trgt2categorical(y_test, n_classes)
             y_train = Functions.NpUtils.DataTransformation.trgt2categorical(y_train, n_classes)
@@ -1492,9 +1493,12 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
             if verbose:
                 print "Fold: " + str(fold_count) + '\n'
-                print "Class Weights:"
-                for cls in class_weights:
-                    print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+                if not class_weights is None:
+                    print "Class Weights:"
+                    for cls in class_weights:
+                        print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+                else:
+                    print "Balanced classes"
 
             # PASSAR PARA TRAINPARAMETERS
             # TODO pass novelty path creation to ModelPath class
@@ -1514,18 +1518,18 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                   class_weight=class_weights, verbose=verbose,
                                                   max_restarts=4, restart_tol=0.60)
 
-            model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
-            model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
+            model.save(novelty_path_offset + model.model_files + '/%i_fold.h5' % fold_count)
+            model.model = load_model(novelty_path_offset + model.model_best + '/%i_fold.h5' % fold_count)
 
             model_predictions[fold_count] = model.predict(x_test_nv)
-            if not novelty_cls is None:
+            if not novelty_cls is None: #Add NaN to novelty class column and correct labels column
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count][:, :novelty_cls],
                      np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
                      model_predictions[fold_count][:, novelty_cls:],
                      np.array(y_test.argmax(axis=1)[:,np.newaxis], dtype=np.int)],
                     axis=1)
-            else:
+            else: # Add correct labels column
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count],
                      np.array(y_test.argmax(axis=1)[:, np.newaxis], dtype=np.int)],
@@ -1551,7 +1555,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         history_ar = [history for history, _ in model_results]
         predictions_ar = [predictions for _, predictions in model_results]
 
-
         column_names = class_labels.values()
         column_names.append('Label')
 
@@ -1565,8 +1568,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                        for i_fold, fold_history in enumerate(history)] for nv_cls, history in
                       zip(novelty_classes, history_ar)]
 
-
-
         pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
         pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
 
@@ -1576,7 +1577,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         pd_pred.to_csv(preds_file, sep=',')
         pd_hist.to_csv(hist_file, sep=',')
 
-    def _getGradientWeights(self, y_train, mode = 'standard', novelty_cls=None):
+
+    def _getGradientWeights(self, y_train, mode='standard', novelty_cls=None):
         cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)
         min_class = min(event_count)
         if not novelty_cls is None:
