@@ -723,8 +723,20 @@ class ModelDataCollection:
         self.history = dict()
         self.predictions = dict()
 
+        self.trained_cvs = self.getTrainedCVs()
+
         if not exists(self.an_path):
             mkdir(self.an_path)
+
+
+    def getTrainedCVs(self):
+        trained_cvs = dict()
+
+        for cv_name, cv in self.n_cv.cv.items():
+            fold_path = self.modelpath + '/%s/' % cv_name
+            if exists(fold_path):
+                trained_cvs[cv_name] = cv
+        return trained_cvs
 
     def fecthHistory(self, overwrite=False):
         collections_filepath = self.an_path + '/history_collection.jbl'
@@ -733,7 +745,7 @@ class ModelDataCollection:
                   "To overwrite existing configuration, set overwrite to True")
             self.history = load(collections_filepath)
             return
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             fold_path = self.modelpath + '/%s/history.csv' % cv_name
             self.history[cv_name] = pd.read_csv(fold_path,
                                                 index_col=[0, 1, 2],
@@ -747,7 +759,7 @@ class ModelDataCollection:
                   "To overwrite existing configuration, set overwrite to True")
             self.predictions = load(collections_filepath)
             return
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             fold_path = self.modelpath + '/%s/predictions.csv' % cv_name
 
             self.predictions[cv_name] = pd.read_csv(fold_path,
@@ -765,7 +777,7 @@ class ModelDataCollection:
 
     def plotConfusionMatrices(self, figsize=(10, 12), overwrite=False):
         class_labels = self.class_labels
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             saving_path = self.an_path + '/%s/cm/' % cv_name
             cv_prediction = self.predictions[cv_name]
             if not exists(saving_path):
@@ -801,7 +813,7 @@ class ModelDataCollection:
             for score in scores:
                 scores_labels['val_' + score] = 'Val ' + scores_labels[score]
 
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             losspath = self.an_path + '/%s/loss/' % cv_name
             sns.set_style("whitegrid")
 
@@ -875,6 +887,7 @@ class ModelDataCollection:
         class_labels = self.class_labels
 
         def getScoresDict(fold_predictions, class_labels):
+            print fold_predictions
             cat_predictions = fold_predictions.drop(columns='Label').values.argmax(axis=1)
             recall_values = recall_score(fold_predictions['Label'], cat_predictions)
             scores_dict =  {'Eff %s' % class_labels[cls_i]: recall_value
@@ -891,12 +904,12 @@ class ModelDataCollection:
             model_scores = pd.DataFrame(model_scores.values(), index=index)
             return model_scores
 
-        model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs], axis=0)
+        model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs.items()], axis=0)
         return model_scores
 
     def plotDensities(self, bins=50, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
         class_labels = self.class_labels
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             densitypath = self.an_path + '/%s/densities/' % cv_name
             sns.set_style("whitegrid")
 
@@ -953,7 +966,7 @@ class ModelDataCollection:
     def plotRunsPredictions(self, data, trgt, overwrite=False):
         k_model = KerasModel(self.params)
         window_size = self.params.input_shape[0]
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             k_model.selectFoldConfig(10, mode=cv_name)
 
             outputpath = self.an_path + '/%s/outputs/pred_maps' % (cv_name)
@@ -968,22 +981,29 @@ class ModelDataCollection:
                     run = x_test[y_test == cls_i]
                     run_trgt = y_test[y_test == cls_i]
                     run_p = p_test[y_test == cls_i]
-
+                    print i_fold
+                    print 'Eff %s' % cls_i
+                    print sum(run_p == run_trgt)/float(len(run_trgt))
                     # TODO pass this to NestedCV and recover here as an attribute
                     ship_name = [ship_name
                                  for ship_name, ship_indices in self.n_cv.info.runs_named[cls_str].items()
                                  if np.isin(test_index, ship_indices).any()]
                     fig = plt.figure(figsize=(10,10))
                     ax = plt.gca()
+                    print ship_name
 
                     plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
 
                     mask = np.concatenate([np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
                                            for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
-
-                    ax.imshow(mask[:, :, 0], alpha=.4, cmap=plt.get_cmap('coolwarm_r', 2),
+                    from matplotlib import colors
+                    cmap = colors.ListedColormap(['red', 'blue'])
+                    bounds = [0, 0.5, 1]
+                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                    x = ax.imshow(mask[:, :, 0], alpha=.35, cmap=cmap,#plt.get_cmap('coolwarm_r', 2),
                               extent=[1, mask.shape[1], mask.shape[0], 1],
-                              aspect="auto")
+                              aspect="auto", vmin=0, vmax=1)
+                    # plt.colorbar(x, ax=ax, ticks=[0,1], boundaries=bounds)
 
                     filepath = outputpath + '/%s' % cls_str
                     if not exists(filepath):
@@ -1001,7 +1021,7 @@ class ModelDataCollection:
 
         k_model = KerasModel(self.params)
         window_size = self.params.input_shape[0]
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             k_model.selectFoldConfig(10, mode=cv_name)
             for n, layer in enumerate(self.params.layers):
                 if layer.identifier in layers_id:
@@ -1031,15 +1051,14 @@ class ModelDataCollection:
                                     #     print "Layer %s_%i output already plotted. For overwriting current plots, " \
                                     #           "set overwrite to True. Exiting." % (layer.identifier, n)
                                     #     break
-                                print 'hey'
-                                plotLOFARgram(channel, filename=outpath + '/%i_fold_%s.pdf' % (i_fold, ship_name))
+                                plotLOFARgram(channel, filename=outpath + '/%i_fold_%s.png' % (i_fold, ship_name))
 
     def _reconstructPredictions(self, data, trgt, image_window):
         """Retro-compatibility function. Used to update prediction files old storage format to the new one"""
         class_labels = self.class_labels
         import keras.backend as K
         run_info = SonarRunsInfo(self.n_cv.audiodatapath)
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             gt = np.array([])
             fold_path = self.modelpath + '/%s' % cv_name
             predictions = pd.DataFrame(columns=class_labels.values())

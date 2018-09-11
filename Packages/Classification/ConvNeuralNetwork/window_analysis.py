@@ -69,7 +69,8 @@ cnn_an = ModelDataCollection(ncv, trnparams, package_name, 'test_an', class_labe
 # cnn_an.plotDensities()
 # cnn_an.plotRuns(data, trgt, ["Conv2D"], overwrite=False)
 
-window_grid = [10, 20, 30, 40, 50]
+#window_grid = [10, 20, 30, 40, 50]
+window_grid = [30,40,50]
 stride_grid = [10]
 from itertools import product
 param_mapping = dict()
@@ -102,7 +103,7 @@ for (image_window, im_stride) in window_grid:
 
     model = ModelDataCollection(ncv, trnparams, package_name, 'iter_2/window_analysis/%i' % image_window, class_labels)
     #model._reconstructPredictions(data, trgt, image_window)
-    model.plotLayerOutputs(data,trgt,'Conv2D')
+    model.plotLayerOutputs(data,trgt,'MaxPooling2D')
     #model.plotRunsPredictions(data,trgt)
 
 #all_an = CnnClassificationAnalysis(ncv, param_mapping, package_name, 'iter_2/window_analysis', class_labels)
