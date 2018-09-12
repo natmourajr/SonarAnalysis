@@ -91,3 +91,20 @@ def lofar2image(all_data, all_trgt,
         trgt_image[image_index] = all_trgt[spectre_index]
 
     return [image_data, trgt_image]
+
+def lofar_mean(data, trgt, sliding_window):
+    def ndma(data, sliding_window, axis):
+        return np.concatenate([np.mean(sample, axis=axis, keepdims=True)
+                               for sample in np.split(data, data.shape[axis]/sliding_window, axis=axis)],
+                               axis=axis)
+
+    def average_samples(data, trgt, cls_i):
+        cls_data = data[trgt == cls_i]
+        cls_averaged_data = ndma(cls_data, sliding_window, axis=1)
+        return cls_averaged_data
+
+    averaged_data = np.concatenate([average_samples(data, trgt, cls_i) for cls_i in np.unique(trgt)],
+                                   axis=0)
+    return averaged_data
+
+

@@ -1416,20 +1416,31 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                     pass
 
             start = time.time()
-            model_results = np.array(
-                map(lambda cls: self._fitModel(model,
+            # model_results = np.array(
+            #     map(lambda cls: self._fitModel(model,
+            #                                    data,
+            #                                    trgt,
+            #                                    class_labels,
+            #                                    transform_fn,
+            #                                    preprocessing_fn,
+            #                                    novelty_cls=cls,
+            #                                    verbose=verbose[1],
+            #                                    fold_balance=fold_balance),
+            #         novelty_classes),
+            #     dtype=object)
+            #
+            # self._saveResults(model, model_results, novelty_classes, class_labels)
+            for nv_cls in novelty_classes:
+                model_results = self._fitModel(model,
                                                data,
                                                trgt,
                                                class_labels,
                                                transform_fn,
                                                preprocessing_fn,
-                                               novelty_cls=cls,
+                                               nv_cls,
                                                verbose=verbose[1],
-                                               fold_balance=fold_balance),
-                    novelty_classes),
-                dtype=object)
+                                               fold_balance=fold_balance)
 
-            self._saveResults(model, model_results, novelty_classes, class_labels)
 
             if verbose[0]:
                 end = time.time()
@@ -1440,9 +1451,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                   verbose=False, fold_balance = None):
         # from pympler.tracker import SummaryTracker
         # tracker = SummaryTracker()
-
         n_classes = len(class_labels)
-
         if not novelty_cls is None:
             novelty_path_offset = '/' + class_labels[novelty_cls] + '/'
         else:
@@ -1477,6 +1486,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             x_test = x_test[y_test != novelty_cls]
 
             y_train = y_train[y_train != novelty_cls]
+            y_test_nv = y_test
             y_test = y_test[y_test != novelty_cls]
 
             if fold_balance == 'class_weights':
@@ -1506,7 +1516,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 SystemIO.mkdir(model.model_best + novelty_path_offset)
             if not SystemIO.exists(model.model_files + novelty_path_offset):
                 SystemIO.mkdir(model.model_files + novelty_path_offset)
-
             bestmodel = callbacks.ModelCheckpoint(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count,
                                                   monitor='val_loss', mode='min', verbose=1, save_best_only=True)
 
@@ -1518,16 +1527,17 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                   class_weight=class_weights, verbose=verbose,
                                                   max_restarts=4, restart_tol=0.60)
 
-            model.save(novelty_path_offset + model.model_files + '/%i_fold.h5' % fold_count)
-            model.model = load_model(novelty_path_offset + model.model_best + '/%i_fold.h5' % fold_count)
+            model.save(model.model_files + novelty_path_offset  + '/%i_fold.h5' % fold_count)
+            model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
 
             model_predictions[fold_count] = model.predict(x_test_nv)
-            if not novelty_cls is None: #Add NaN to novelty class column and correct labels column
+            print model_predictions[fold_count].shape
+            if not novelty_cls is None: # Add NaN to novelty class column and correct labels column
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count][:, :novelty_cls],
                      np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
                      model_predictions[fold_count][:, novelty_cls:],
-                     np.array(y_test.argmax(axis=1)[:,np.newaxis], dtype=np.int)],
+                     np.array(y_test_nv[:,np.newaxis], dtype=np.int)],
                     axis=1)
             else: # Add correct labels column
                 model_predictions[fold_count] = np.concatenate(
@@ -1541,6 +1551,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
 
+        self._saveResults(model, (model_history, model_predictions), novelty_cls, class_labels)
+
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
         return model_history, model_predictions
@@ -1550,33 +1562,56 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         warn("Limit : [0,9]!")
         return int(fold_str[0])
 
+    # @staticmethod
+    # def _saveResults(model, model_results, novelty_classes, class_labels):
+    #     history_ar = [history for history, _ in model_results]
+    #     predictions_ar = [predictions for _, predictions in model_results]
+    #
+    #     column_names = class_labels.values()
+    #     column_names.append('Label')
+    #
+    #     predictions_pd = [[pd.DataFrame(fold_prediction, columns=column_names,
+    #                                     index=pd.MultiIndex.from_product(
+    #                                         [['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
+    #                        for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in
+    #                       zip(novelty_classes, predictions_ar)]
+    #     history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
+    #         [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
+    #                    for i_fold, fold_history in enumerate(history)] for nv_cls, history in
+    #                   zip(novelty_classes, history_ar)]
+    #
+    #     pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
+    #     pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
+    #
+    #     hist_file = model.model_history
+    #     preds_file = model.model_predictions
+    #
+    #     pd_pred.to_csv(preds_file, sep=',')
+    #     pd_hist.to_csv(hist_file, sep=',')
     @staticmethod
-    def _saveResults(model, model_results, novelty_classes, class_labels):
+    def _saveResults(model, model_results, novelty_cls, class_labels):
         history_ar = [history for history, _ in model_results]
         predictions_ar = [predictions for _, predictions in model_results]
 
         column_names = class_labels.values()
         column_names.append('Label')
 
-        predictions_pd = [[pd.DataFrame(fold_prediction, columns=column_names,
+        predictions_pd = [pd.DataFrame(fold_prediction, columns=column_names,
                                         index=pd.MultiIndex.from_product(
-                                            [['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
-                           for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in
-                          zip(novelty_classes, predictions_ar)]
-        history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
-            [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
-                       for i_fold, fold_history in enumerate(history)] for nv_cls, history in
-                      zip(novelty_classes, history_ar)]
+                                            [['fold_%i' % i_fold], range(fold_prediction.shape[0])]))
+                           for i_fold, fold_prediction in enumerate(predictions_ar)]
+        history_pd = [pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
+            [['fold_%i' % i_fold], range(len(fold_history['loss']))]))
+                       for i_fold, fold_history in enumerate(history_ar)]
 
-        pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
-        pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
+        pd_pred = pd.concat(predictions_pd)
+        pd_hist = pd.concat(predictions_pd)
 
-        hist_file = model.model_history
-        preds_file = model.model_predictions
+        hist_file = model.model_history[:-3] + '%i.csv' % novelty_cls
+        preds_file = model.model_predictions[:-3] + '%i.csv' % novelty_cls
 
         pd_pred.to_csv(preds_file, sep=',')
         pd_hist.to_csv(hist_file, sep=',')
-
 
     def _getGradientWeights(self, y_train, mode='standard', novelty_cls=None):
         cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)

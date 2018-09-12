@@ -103,8 +103,8 @@ for (image_window, im_stride) in window_grid:
 
     model = ModelDataCollection(ncv, trnparams, package_name, 'iter_2/window_analysis/%i' % image_window, class_labels)
     #model._reconstructPredictions(data, trgt, image_window)
-    model.plotLayerOutputs(data,trgt,'MaxPooling2D')
-    #model.plotRunsPredictions(data,trgt)
+    #model.plotLayerOutputs(data,trgt,'MaxPooling2D')
+    model.plotRunsPredictions(data,trgt)
 
 #all_an = CnnClassificationAnalysis(ncv, param_mapping, package_name, 'iter_2/window_analysis', class_labels)
 #all_an.plotScores()

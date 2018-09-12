@@ -37,7 +37,6 @@ class _Path(object):
 class ConvolutionPaths(_Path):
     """Class with references to all sub-folders(models and results)
     required for the convolution models training and analysis"""
-    #results_path = './Analysis'
     results_path = os.getenv('PACKAGE_NAME')
 
     def __init__(self):

@@ -25,6 +25,8 @@ class RestartTraining(keras.callbacks.Callback):
 
         self.mode = mode
 
+    #def on_epoch_end(self, epoch, logs=None):
+
     def on_train_end(self, logs={}):
         current = logs.get(self.monitor)
         if current is None:

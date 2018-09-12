@@ -9,7 +9,10 @@ from keras.models import load_model
 
 import sklearn.metrics
 from sklearn.externals import joblib
-from Functions.DataHandler import NestedCV, lofar2image, SonarRunsCV
+
+from Functions.FunctionsDataVisualization import plotLOFARgram
+from Functions.NpUtils.DataTransformation import lofar2image, lofar_mean, SonarRunsInfo
+from Functions.CrossValidation import NestedCV, SonarRunsCV
 
 init_time = time.time()
 
@@ -39,25 +42,28 @@ else:
                                                                    (data_path,database,n_pts_fft,decimation_rate,spectrum_bins_left))
 
 
-ncv = NestedCV(5,10, results_path, audiodatapath)
+ncv = NestedCV(5,10, data_path, audiodatapath)
 ncv.loadCVs()
-window = 20
+window = 40
 stride = 10
-x = np.array([1,2,3,4,5])
-y = np.array([1,2,3])
-print np.isin(y,x)
+print results_path
 for cv_name, cv in ncv.cv.items():
-    cv_info = SonarRunsCV(10, audiodatapath + '/' + database)
+    run_info = SonarRunsInfo(audiodatapath + '/' + database)
     print cv_name
-    for train,test in cv:
+    for i_fold, (train,test) in enumerate(cv):
         #x_train, y_train = lofar2image(data, trgt, train, class_labels, window, stride,
         #                               run_split_info=cv_info)
-        x_test, y_test = lofar2image(data, trgt, test, class_labels, window, window,
-                                     run_split_info=cv_info)
-        print '\tIndices Train: %s Test: %s' % (train.shape, test.shape)
-        #print '\tTrain: %s  Test : %s' % (x_train.shape, y_train.shape)
-        print '\tTest: %s  Test : %s' % (x_test.shape, y_test.shape)
-        #print x_test
+        x_test, y_test = lofar2image(data, trgt, test, window, window,
+                                     run_indices_info=run_info)
+        # print '\tIndices Train: %s Test: %s' % (train.shape, test.shape)
+        # #print '\tTrain: %s  Test : %s' % (x_train.shape, y_train.shape)
+        # print '\tTest: %s  Test : %s' % (x_test.shape, y_test.shape)
+        # #print x_test
+        new_xtest = lofar_mean(x_test, y_test, 4)
+
+        for cls_i in np.unique(trgt):
+            plotLOFARgram(np.concatenate(new_xtest[y_test == cls_i][:,:,:,0], axis=0),
+                          filename='/home/pedrolisboa/lofar_mean_test/%s_%i_%i.png' % (cv_name, cls_i, i_fold))
 
 
 
