@@ -1590,8 +1590,8 @@ class ConvolutionTrainFunction(ConvolutionPaths):
     #     pd_hist.to_csv(hist_file, sep=',')
     @staticmethod
     def _saveResults(model, model_results, novelty_cls, class_labels):
-        history_ar = [history for history, _ in model_results]
-        predictions_ar = [predictions for _, predictions in model_results]
+        history_ar = [history for history in model_results[0]]
+        predictions_ar = [predictions for predictions in model_results[1]]
 
         column_names = class_labels.values()
         column_names.append('Label')
