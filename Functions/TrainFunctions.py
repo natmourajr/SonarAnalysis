@@ -1607,8 +1607,12 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         pd_pred = pd.concat(predictions_pd)
         pd_hist = pd.concat(predictions_pd)
 
-        hist_file = model.model_history[:-3] + '%i.csv' % novelty_cls
-        preds_file = model.model_predictions[:-3] + '%i.csv' % novelty_cls
+        if not novelty_cls is None:
+            hist_file = model.model_history[:-3] + '%i.csv' % novelty_cls
+            preds_file = model.model_predictions[:-3] + '%i.csv' % novelty_cls
+        else:
+            hist_file = model.model_history
+            preds_file = model.model_predictions
 
         pd_pred.to_csv(preds_file, sep=',')
         pd_hist.to_csv(hist_file, sep=',')
