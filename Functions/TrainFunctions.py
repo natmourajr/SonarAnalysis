@@ -1472,16 +1472,17 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             if fold_count in trained_folds:
                 continue
 
-            x_train , y_train = transform_fn(all_data=data, all_trgt=trgt,
-                                             index_info=train_index, info='train')
-            x_test, y_test = transform_fn(all_data=data, all_trgt=trgt,
-                                          index_info=test_index, info='val')
-
             if not scaler is None:
                 print 'Scaling'
-                scaler().fit(x_train)
-                x_train = scaler().transform(x_train)
-                x_test = scaler().transform(x_test)
+                scaler().fit(x_train[train_index])
+                norm_data = scaler().transform(data)
+            else:
+                norm_data = data
+
+            x_train , y_train = transform_fn(all_data=norm_data, all_trgt=trgt,
+                                             index_info=train_index, info='train')
+            x_test, y_test = transform_fn(all_data=norm_data, all_trgt=trgt,
+                                          index_info=test_index, info='val')
 
             x_train = x_train[y_train != novelty_cls]
             x_test_nv = x_test
