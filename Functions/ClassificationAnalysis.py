@@ -603,8 +603,8 @@ class NeuralClassification(ClassificationBaseClass):
 
 
 class CnnClassificationAnalysis:
-    def __init__(self, ncv_obj, trn_params_mapping, package_name, analysis_name, class_labels):
-        self.modelsData = {model_name: ModelDataCollection(ncv_obj, trnParams, package_name,
+    def __init__(self, ncv_obj, trn_params_mapping, package_name, modelpaths, analysis_name, class_labels):
+        self.modelsData = {model_name: ModelDataCollection(ncv_obj, trnParams, package_name, modelpaths,
                                                            analysis_name + '/%s' % model_name,
                                                            class_labels)
                               for model_name, trnParams in trn_params_mapping.items()}
@@ -614,7 +614,7 @@ class CnnClassificationAnalysis:
             # modelData.fecthHistory()
 
         self.an_path = package_name + '/' + analysis_name
-        self.resultspath = package_name
+        self.resultspath = package_name + '/' + modelpaths
         self.class_labels = class_labels
         self.scores = None
         self.getScores()
@@ -631,7 +631,6 @@ class CnnClassificationAnalysis:
 
     def getScores(self):
         scores = {model_name:cnn_an.getScores() for model_name, cnn_an in self.modelsData.items()}
-
         for model_name in scores.keys():
             scores[model_name]['Model'] = model_name
 
@@ -711,13 +710,13 @@ class CnnClassificationAnalysis:
 
 
 class ModelDataCollection:
-    def __init__(self, ncv_obj, trnParams, package_name, analysis_name, class_labels):
+    def __init__(self, ncv_obj, trnParams, package_name, modelpaths, analysis_name, class_labels):
         self.n_cv = ncv_obj
         self.params = trnParams
         # TODO add already trained folds check
-        self.an_path = package_name + '/' + analysis_name
-        self.resultspath = package_name
-        self.modelpath = package_name + '/' + trnParams.getParamPath()
+        self.an_path = package_name + '/' + analysis_name + '/' + modelpaths
+        #self.resultspath = package_name
+        self.modelpath = package_name + '/' + modelpaths + '/' + trnParams.getParamPath()
         self.trained_cvs = self.n_cv.cv.items()
         self.class_labels = class_labels
         self.history = dict()
@@ -764,6 +763,7 @@ class ModelDataCollection:
 
             self.predictions[cv_name] = pd.read_csv(fold_path,
                                                     index_col=[0, 1])
+            print 'here'
             # cls_nv = self.resultspath[-6:]
             # inverse_cls = {value: key for key,value in self.class_labels.items()}
             # print self.predictions[cv_name]['Unnamed: 1'] == inverse_cls[cls_nv]
@@ -885,7 +885,6 @@ class ModelDataCollection:
 
     def getScores(self):
         class_labels = self.class_labels
-
         def getScoresDict(fold_predictions, class_labels):
             print fold_predictions
             cat_predictions = fold_predictions.drop(columns='Label').values.argmax(axis=1)
@@ -903,23 +902,22 @@ class ModelDataCollection:
             index = pd.MultiIndex.from_tuples(model_scores.keys(), names=['CV', 'Fold'])
             model_scores = pd.DataFrame(model_scores.values(), index=index)
             return model_scores
-
         model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs.items()], axis=0)
         return model_scores
 
-    def plotDensities(self, bins=50, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
+    def plotDensities(self, bins=30, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
         class_labels = self.class_labels
         for cv_name, cv in self.trained_cvs.items():
             densitypath = self.an_path + '/%s/densities/' % cv_name
             sns.set_style("whitegrid")
 
-            # if not exists(densitypath):
-            #     mkdir(densitypath)
-            # else:
-            #     if not overwrite:
-            #         print "Densities already plotted. For overwriting current plots, " \
-            #               "set overwrite to True. Exiting."
-            #         return
+            if not exists(densitypath):
+                mkdir(densitypath)
+            else:
+                if not overwrite:
+                    print "Densities already plotted. For overwriting current plots, " \
+                          "set overwrite to True. Exiting."
+                    return
 
             plt.style.use('seaborn-whitegrid')
             predictions = self.predictions[cv_name]
@@ -957,11 +955,43 @@ class ModelDataCollection:
                         axes[i,j].tick_params(axis='both', which='both', labelsize=10)
                         for tick in axes[i,j].get_xticklabels():
                             tick.set_rotation(xtick_rotation)
-
                         axes[0,j].set_title(class_labels[inverted_labels[pred_label]], fontsize = 15)
                         axes[i,0].set_ylabel(class_labels[i], fontsize = 15)
                 fig.savefig(densitypath + '/%s.pdf' % fold_name, bbox_inches='tight')
                 plt.close(fig)
+
+
+
+            fig = plt.figure(figsize=(15, 8))
+            grid = plt.GridSpec(n_classes, n_outputs, hspace=hspace, wspace=wspace)
+            colors = ['b', 'r', 'g', 'y']
+            if nv_class:
+                colors[inverted_labels[nv_class]] = 'k'
+
+            axes = np.array([[fig.add_subplot(grid[i, j])
+                              for j in range(0, n_outputs)]
+                              for i in range(0, n_classes)])
+            for correct_label, cls_predictions in predictions.groupby(by='Label'):
+                for pred_i, pred_label in enumerate(cls_predictions.filter(regex=('Class*'))):
+                    i, j = int(correct_label), pred_i
+                    network_output = cls_predictions[pred_label].values  # Output for the predicted class
+                    weights = np.zeros_like(network_output) + 1. / network_output.shape[0]  # Normalize bins
+                    axes[i, j].hist(cls_predictions[pred_label].values,
+                                    bins=bins,
+                                    color=colors[i],
+                                    weights=weights,
+                                    histtype='stepfilled',
+                                    alpha=.6)
+                    axes[i, j].set_yscale('log')
+                    axes[i, j].set_yticks(np.logspace(-3, 0, 4))
+                    axes[i, j].tick_params(axis='both', which='both', labelsize=10)
+                    for tick in axes[i, j].get_xticklabels():
+                        tick.set_rotation(xtick_rotation)
+
+                    axes[0, j].set_title(class_labels[inverted_labels[pred_label]], fontsize=15)
+                    axes[i, 0].set_ylabel(class_labels[i], fontsize=15)
+            fig.savefig(densitypath + '/total_densities.png', bbox_inches='tight')
+            plt.close(fig)
 
     def plotRunsPredictions(self, data, trgt, overwrite=False):
         k_model = KerasModel(self.params)

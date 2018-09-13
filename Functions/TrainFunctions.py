@@ -1390,7 +1390,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         self.fold_config = folds
         self.n_folds = len(folds)
 
-    def train(self, transform_fn, preprocessing_fn, fold_mode='shuffleRuns', fold_balance='class_weights', novelty_classes= None,
+    def train(self, transform_fn, scaler, fold_mode='shuffleRuns', fold_balance='class_weights', novelty_classes= None,
               verbose=(0, 0, 0)):
 
         novelty_classes = novelty_classes or [None]
@@ -1436,7 +1436,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                trgt,
                                                class_labels,
                                                transform_fn,
-                                               preprocessing_fn,
+                                               scaler,
                                                nv_cls,
                                                verbose=verbose[1],
                                                fold_balance=fold_balance)
@@ -1447,7 +1447,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 print 'Training: %i (seg) / %i (min) /%i (hours)' % (
                 end - start, (end - start) / 60, (end - start) / 3600)
 
-    def _fitModel(self, model, data, trgt, class_labels, transform_fn, preprocessing_fn=None, novelty_cls=None,
+    def _fitModel(self, model, data, trgt, class_labels, transform_fn, scaler=None, novelty_cls=None,
                   verbose=False, fold_balance = None):
         # from pympler.tracker import SummaryTracker
         # tracker = SummaryTracker()
@@ -1473,13 +1473,15 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 continue
 
             x_train , y_train = transform_fn(all_data=data, all_trgt=trgt,
-                                            index_info=train_index, info='train')
+                                             index_info=train_index, info='train')
             x_test, y_test = transform_fn(all_data=data, all_trgt=trgt,
                                           index_info=test_index, info='val')
 
-            if preprocessing_fn is not None:
-                x_train, y_train = preprocessing_fn(x_train, y_train)
-                x_test, y_test = preprocessing_fn(x_test, y_test)
+            if not scaler is None:
+                print 'Scaling'
+                scaler().fit(x_train)
+                x_train = scaler().transform(x_train)
+                x_test = scaler().transform(x_test)
 
             x_train = x_train[y_train != novelty_cls]
             x_test_nv = x_test

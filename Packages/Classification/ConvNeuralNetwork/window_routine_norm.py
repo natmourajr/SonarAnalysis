@@ -1,7 +1,4 @@
 import sys
-
-from Functions.DataHandler import DataBalancer
-
 sys.path.extend(['/home/pedrolisboa/Workspace/lps/SonarAnalysis/'])
 
 from Functions.TrainFunctions import ConvolutionTrainFunction
@@ -50,13 +47,13 @@ else:
 if not exists(results_path + '/' + 'iter_2/window_run'):
     mkdir(results_path + '/' 'iter_2/window_run')
 
-window_grid = [10, 20, 30, 40, 50]#, 60, 70, 80]
+window_grid = [10, 20, 30, 40, 50, 60, 70, 80]
 stride_grid = [10]
 from itertools import product
 window_grid = list(product(window_grid, stride_grid))
 for cv_name, cv in ncv.cv.items():
     for (image_window, im_stride) in window_grid:
-        trnparams = TrnParamsConvolutional(prefix="convnet_balanced/stride_%s" % im_stride,
+        trnparams = TrnParamsConvolutional(prefix="convnet/stride_%s" % im_stride,
                                            input_shape=(image_window, 400, 1), epochs=30,
                                            layers=[
                                                ["Conv2D", {"filters": 6,
@@ -79,30 +76,27 @@ for cv_name, cv in ncv.cv.items():
                                            ],
                                            loss="categorical_crossentropy")
 
+        run_info = SonarRunsInfo(audiodatapath + '/' + database)
+
         def transform_fn(all_data, all_trgt, index_info, info):
-            run_info = SonarRunsInfo(audiodatapath + '/' + database)
-            class_labels = {0:'ClassA',1:'ClassB',2:'ClassC',3:'ClassD'}
             if info == 'train':
                 stride = im_stride
             else:
                 stride = image_window
-            x_test,y_test = lofar2image(all_data=all_data,
-                                        all_trgt=all_trgt,
-                                        index_info=index_info,
-                                        window_size=image_window,
-                                        stride=stride,
-                                        run_indices_info=run_info)
+            return  lofar2image(all_data=all_data,
+                                all_trgt=all_trgt,
+                                index_info=index_info,
+                                window_size=image_window,
+                                stride=stride,
+                                run_indices_info=run_info)
 
-            if info == 'train':
-                db = DataBalancer()
-                return db.oversample(x_test, y_test, class_labels,verbose=1)
-            return x_test,y_test
 
+        from sklearn.preprocessing import StandardScaler
 
         cvt = ConvolutionTrainFunction()
         cvt.loadModels([trnparams], KerasModel)
         cvt.loadData(dataset)
         cvt.loadFolds(cv)
-        cvt.train(transform_fn=transform_fn, scaler=None,
-                  fold_mode=cv_name, fold_balance='balanced',
+        cvt.train(transform_fn=transform_fn, scaler=StandardScaler,
+                  fold_mode=cv_name, fold_balance='class_weights',
                   verbose=(1, 1, 1))

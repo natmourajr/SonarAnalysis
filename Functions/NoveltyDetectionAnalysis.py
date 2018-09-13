@@ -470,6 +470,8 @@ class CnnNoveltyAnalysis(object):
             novelty_classes = class_labels
 
         self.an_path = package_name + '/' + analysis_name
+        if not exists(self.an_path):
+            mkdir(self.an_path)
         self.resultspath = package_name
         self.ncv_obj = ncv_obj
         self.class_labels = class_labels
@@ -477,8 +479,9 @@ class CnnNoveltyAnalysis(object):
         for cls in novelty_classes.values():
             self.ModelsAnalysis[cls] = CnnClassificationAnalysis(ncv_obj,
                                                                  trn_params_mapping,
-                                                                 package_name + '/%s' % cls,
-                                                                 '../%s' % cls + analysis_name,
+                                                                 package_name,
+                                                                 '/%s' % cls,
+                                                                 analysis_name,
                                                                  class_labels)
 
         self.nv_predictions = None

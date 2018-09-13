@@ -94,6 +94,6 @@ for cv_name, cv in ncv.cv.items():
         cvt.loadModels([trnparams], KerasModel)
         cvt.loadData(dataset)
         cvt.loadFolds(cv)
-        cvt.train(transform_fn=transform_fn, preprocessing_fn=None,
+        cvt.train(transform_fn=transform_fn, scaler=None,
                   fold_mode=cv_name, fold_balance='class_weights',
                   verbose=(1, 1, 1))
