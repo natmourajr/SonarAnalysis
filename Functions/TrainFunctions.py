@@ -1474,7 +1474,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
             if not scaler is None:
                 print 'Scaling'
-                scaler().fit(x_train[train_index])
+                scaler().fit(data[train_index])
                 norm_data = scaler().transform(data)
             else:
                 norm_data = data
