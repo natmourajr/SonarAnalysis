@@ -763,7 +763,6 @@ class ModelDataCollection:
 
             self.predictions[cv_name] = pd.read_csv(fold_path,
                                                     index_col=[0, 1])
-            print 'here'
             # cls_nv = self.resultspath[-6:]
             # inverse_cls = {value: key for key,value in self.class_labels.items()}
             # print self.predictions[cv_name]['Unnamed: 1'] == inverse_cls[cls_nv]
@@ -803,7 +802,6 @@ class ModelDataCollection:
             scores = ['spIndex', 'val_spIndex', 'loss', 'val_loss']
         else:
             scores.extend(['val_' + score for score in scores])
-            print scores
         if scores_labels is None:
             scores_labels = {'spIndex': 'Train SP Index',
                              'val_spIndex': 'Val SP Index',
@@ -886,7 +884,6 @@ class ModelDataCollection:
     def getScores(self):
         class_labels = self.class_labels
         def getScoresDict(fold_predictions, class_labels):
-            print fold_predictions
             cat_predictions = fold_predictions.drop(columns='Label').values.argmax(axis=1)
             recall_values = recall_score(fold_predictions['Label'], cat_predictions)
             scores_dict =  {'Eff %s' % class_labels[cls_i]: recall_value

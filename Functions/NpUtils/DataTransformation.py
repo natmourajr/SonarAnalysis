@@ -63,6 +63,51 @@ class SonarRunsInfo():
         return range(offset, end_frame)
 
 
+class Lofar2Image:
+    def __init__(self, window_size, stride,
+                 index_info, run_indices_info,
+                 filepath = None, dtype=np.float64):
+
+        self.window_size = window_size
+        self.run_indices_info = run_indices_info
+        self.filepath = filepath
+        self.dtype = dtype
+        self.index_info = index_info
+        self.stride = stride
+
+        self.pruned_indexes = None
+        self.data_shape = None
+
+    def fit(self, X, y=None):
+        fold_runs = np.concatenate([np.extract([np.isin(run, self.index_info).all() for run in cls_runs], cls_runs)
+                                    for cls_runs in self.run_indices_info.runs.values()])
+
+        self.pruned_indexes = np.concatenate([range(run[0], run[-1] - self.window_size, self.stride)
+                                              for run in fold_runs])
+
+        self.data_shape = (self.pruned_indexes.shape[0],
+                           self.window_size,
+                           X.shape[1],
+                           1)
+
+    def transform(self, X, y):
+        if not self.filepath is None:
+            image_X = np.memmap(filename=self.filepath, shape=self.data_shape, mode='w+', dtype=self.dtype)
+        else:
+            image_X = np.zeros(shape=self.data_shape, dtype=self.dtype)
+
+        image_y = np.zeros(shape=self.data_shape[0])
+
+        for image_index, spectre_index in enumerate(self.pruned_indexes):
+            tmp_X = X[spectre_index:spectre_index + self.window_size, :]
+            tmp_X = np.array(tmp_X.reshape(tmp_X.shape[0], tmp_X.shape[1], 1), np.float64)
+
+            image_X[image_index] = tmp_X
+            image_y[image_index] = y[spectre_index]
+
+        return image_X, image_y
+
+
 def lofar2image(all_data, all_trgt,
                 index_info, window_size, stride,
                 run_indices_info,

@@ -3,6 +3,7 @@
 '''
 
 import matplotlib.pyplot as plt
+import seaborn
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -172,3 +173,75 @@ def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True)
         return
 
 
+def plotHBar(x, y, hue, err, data, height=0.20, order=None, hue_order=None,
+             color=None, capsize=0, ax=None, title='', x_label='',
+             hue_label='', y_label = '', x_margin=10):
+    seaborn.set_style('white')
+
+    if color is None:
+        color = ['#069af3', 'IndianRed', '#76cd26']
+    n_hue = np.unique(data['hue'].values)
+    indices = np.arange(len(np.unique(data[y].values)))  # the x locations for the groups
+
+    def autolabel(rects, ax, model_op, xpos='center', ypos = 'up'):
+        """
+        Attach a text label above each bar in *rects*, displaying its height.
+
+        xpos: indicates which side to place the text w.r.t. the edge of
+        the bar. It can be one of the following {'center', 'right', 'left'}.
+
+        ypos: indicates which side to place the text w.r.t. the center of
+        the bar. It can be one of the following {'center', 'top', 'bottom'}.
+        """
+
+        xpos = xpos.lower()  # normalize the case of the parameter
+        ypos = ypos.lower()
+        va = {'center': 'center', 'top': 'bottom', 'bottom': 'top'}
+        ha = {'center': 'center', 'left': 'right', 'right': 'left'}
+        offset = {'center': 0.5, 'top': 0.57, 'bottom': 0.43}  # x_txt = x + w*off
+
+        for rect, std in zip(rects, model_op['std'].values):
+            width = rect.get_width()
+            ax.text(1.01 * width, rect.get_y() + rect.get_height() * offset[ypos],
+                    '{0:.2f}'.format(round(width,2)) + u'\u00b1' + '{0:.2f}'.format(round(std,2)),
+                    va=va[ypos], ha=ha[xpos], rotation=0)
+
+    fig, ax = plt.subplots()
+    x_inf = max(data[x].values)
+    for group_i, (group_name, group) in enumerate(data.groupby(by=hue)):
+        pos = indices + (group_i - n_hue / 2.0) * (height)
+
+        rect = ax.barh(pos, group[x].values[::-1], height, xerr=group[err].values[::],
+                       color=color[group_i], label=group_name, linewidth=0,
+                       ecolor='black', capsize=capsize, error_kw={'elinewidth': 2.2})
+
+        autolabel(rect, ax, group, "right", "top")
+
+        min_mean = min(group['mean'].values)
+        min_mean_std = group.loc[group['mean'] == min_mean, 'std'].values
+
+        x_margin = x_margin
+        x_low = ((min_mean - min_mean_std) // 10) * 10 - x_margin
+        x_inf = x_low if x_low < x_inf else x_inf
+
+    ax.set_xlim(x_inf, ax.get_xlim()[1] + 10)
+    ax.set_ylim(indices[0] - height * n_hue / 2 - 0.1,
+                indices[-1] + height * n_hue / 2 + 0.55)
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_ylabel(y_label, fontsize=12, fontweight='semibold')
+    ax.set_xlabel(x_label, fontsize=12, fontweight='semibold')
+    ax.set_xticks(np.arange(x_inf, 101, 10))
+    ax.set_yticks(indices)
+    ax.set_yticklabels(np.unique(data[y].values)[::-1])
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    ax.xaxis.grid(True)
+    ax.legend(title=hue_label, fontsize='medium', markerscale=0.7,
+              frameon=True, fancybox=True, shadow=True,
+              bbox_to_anchor=(0.0, 1.025), loc="upper left", ncol=3)
+    fig.tight_layout()
+    plt.show()
