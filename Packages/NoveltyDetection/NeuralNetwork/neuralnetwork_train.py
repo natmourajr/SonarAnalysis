@@ -10,7 +10,7 @@ parser.add_argument("-t", "--threads", default=8, type=int, help="Select the num
 parser.add_argument("--hiddenNeurons", default="1", type=str, help="Select the hidden neurons configuration Ex.: (400x350x300)")
 parser.add_argument("-k", "--modelhash", default="", type=str, help="Parameters Hash")
 parser.add_argument("-s", "--neuronsVariationStep", default=50, type=int, help="Select the step to be used in neurons variation training")
-parser.add_argument("-", "--type", default="normal", type=str, help="Select the type of the training")
+parser.add_argument("-T", "--type", default="normal", type=str, help="Select the type of the training")
 parser.add_argument("-v", "--verbose", default=False, type=bool, help="Verbose")
 
 args = parser.parse_args()

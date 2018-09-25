@@ -18,8 +18,8 @@ import multiprocessing
 
 from keras.utils import np_utils
 from sklearn.externals import joblib
+from sklearn import preprocessing
 
-from Functions.email_utils import EmailConnection, Email
 from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
@@ -75,3 +75,16 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             layer, inovelty, fineTuning, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
         print sysCall
         os.system(sysCall)
+
+    def get_data_scaler(self, inovelty=0, ifold=0):
+        train_id, test_id = self.CVO[inovelty][ifold]
+
+        # normalize known classes
+        if self.parameters["HyperParameters"]["norm"] == "mapstd":
+            scaler = preprocessing.StandardScaler().fit(self.all_data[self.all_trgt!=inovelty][train_id,:])
+        elif self.parameters["HyperParameters"]["norm"] == "mapstd_rob":
+            scaler = preprocessing.RobustScaler().fit(self.all_data[self.all_trgt!=inovelty][train_id,:])
+        elif self.parameters["HyperParameters"]["norm"] == "mapminmax":
+            scaler = preprocessing.MinMaxScaler().fit(self.all_data[self.all_trgt!=inovelty][train_id,:])
+        
+        return scaler

@@ -11,7 +11,7 @@ parser.add_argument("-t", "--threads", default=8, type=int, help="Select the num
 parser.add_argument("--hiddenNeurons", default="1", type=str, help="Select the hidden neurons configuration Ex.: (400x350x300)")
 parser.add_argument("-k", "--modelhash", default="", type=str, help="Parameters Hash")
 parser.add_argument("-s", "--neuronsVariationStep", default=50, type=int, help="Select the step to be used in neurons variation training")
-parser.add_argument("-", "--type", default="normal", type=str, help="Select the type of the training")
+parser.add_argument("-T", "--type", default="normal", type=str, help="Select the type of the training")
 parser.add_argument("-v", "--verbose", default=False, type=bool, help="Verbose")
 
 args = parser.parse_args()
@@ -40,7 +40,7 @@ trn_trgt = analysis.trn_trgt
 trn_trgt_sparse = analysis.trn_trgt_sparse
 
 hidden_neurons = [int(ineuron) for ineuron in args.hiddenNeurons.split('x')]
-neurons_mat = [1] + range(step,hidden_neurons[layer-1]+step,step)
+neurons_mat = [1, 2] + range(step,hidden_neurons[layer-1]+step,step)
 
 if (trainingType == "normal"):
     if (fineTuning):
@@ -95,32 +95,32 @@ elif (trainingType == "neuronSweep"):
             p.close()
             p.join()
 elif (trainingType == "layerSweep"):
-    for ifold in range (analysis.n_folds):
+    for ilayer in range(1,layer+1):
         if (fineTuning):
-            def train(ilayer):
+            def train(fold):
                 SAE[inovelty].train_classifier(data  = trn_data[inovelty],
                                                trgt  = trn_trgt[inovelty],
-                                               ifold = ifold,
-                                               hidden_neurons = hidden_neurons[:ilayer-1],
+                                               ifold = fold,
+                                               hidden_neurons = hidden_neurons[:ilayer],
                                                layer = ilayer
                                               )
             p = multiprocessing.Pool(processes=num_processes)
 
-            results = p.map(train, range(1,layer+1))
+            results = p.map(train, range(analysis.n_folds))
 
             p.close()
             p.join()
         else:
-            def train(ilayer):
+            def train(fold):
                 SAE[inovelty].train_layer(data  = trn_data[inovelty],
-                                          trgt  = trn_trgt[inovelty],
-                                          ifold = ifold,
-                                          hidden_neurons = hidden_neurons[:ilayer-1],
-                                          layer = ilayer
-                                         )
+                                        trgt  = trn_trgt[inovelty],
+                                        ifold = fold,
+                                        hidden_neurons = hidden_neurons[:ilayer],
+                                        layer = ilayer
+                                        )
             p = multiprocessing.Pool(processes=num_processes)
 
-            results = p.map(train, range(1,layer+1))
+            results = p.map(train, range(analysis.n_folds))
 
             p.close()
             p.join()

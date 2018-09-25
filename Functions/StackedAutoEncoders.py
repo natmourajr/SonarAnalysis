@@ -97,7 +97,7 @@ class StackedAutoEncoders:
 
         return norm_data
 
-    # Method that return the Stacked AutoEncoder mode
+    # Method that return the Stacked AutoEncoder model
     def get_model(self, data, trgt, hidden_neurons=None, layer=1, ifold=0):
         if hidden_neurons is None:
             hidden_neurons = [1]
@@ -134,7 +134,7 @@ class StackedAutoEncoders:
                                                   self.sae_prefix_str + "_{}_neurons".format(neurons_str))
 
                 file_name = '%s_fold_%i_model.h5' % (previous_model_str, ifold)
-
+                
                 # Check if previous layer model was trained
                 if not os.path.exists(file_name):
                     self.train_layer(data=data,
@@ -147,8 +147,8 @@ class StackedAutoEncoders:
                 layer_models[ilayer] = load_model(file_name, custom_objects={
                     '%s' % self.parameters["HyperParameters"]["loss"]: self.lossFunction})
 
-                layer_encoder_weights[ilayer] = layer_models[ilayer].layers[0].get_weights()
-                layer_decoder_weights[ilayer] = layer_models[ilayer].layers[2].get_weights()
+                layer_encoder_weights[ilayer] = layer_models[ilayer].get_layer("dense_{}".format(ilayer)).get_weights()
+                layer_decoder_weights[ilayer] = layer_models[ilayer].get_layer("dense_{}".format(ilayer+1)).get_weights()
 
             model = Sequential()
             # Encoder
@@ -271,6 +271,7 @@ class StackedAutoEncoders:
             if layer == 1:
 
                 model.add(Dense(units=hidden_neurons[layer - 1], input_dim=data.shape[1],
+                                bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                 kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
                 model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
                 
@@ -279,21 +280,24 @@ class StackedAutoEncoders:
                     
                 if self.parameters["HyperParameters"]["regularization"] == "l1":
                     model.add(Dense(units=data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"],
                                     kernel_regularizer=regularizers.l1(
                                         self.parameters["HyperParameters"]["regularization_parameter"])))
 
                 elif self.parameters["HyperParameters"]["regularization"] == "l2":
                     model.add(Dense(units=data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"],
                                     kernel_regularizer=regularizers.l2(
                                         self.parameters["HyperParameters"]["regularization_parameter"])))
                 else:
                     model.add(Dense(units=data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))    
                     
-                if bool(self.parameters["HyperParameters"]["dropout"]):
-                    model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
+#                 if bool(self.parameters["HyperParameters"]["dropout"]):
+#                     model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
                 
                 model.add(Activation(self.parameters["HyperParameters"]["decoder_activation_function"]))
             elif layer > 1:
@@ -323,6 +327,7 @@ class StackedAutoEncoders:
                 # end for ilayer in range(1, layer):
 
                 model.add(Dense(units=hidden_neurons[layer - 1], input_dim=proj_all_data.shape[1],
+                                bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                 kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
                 model.add(Activation(self.parameters["HyperParameters"]["encoder_activation_function"]))
 
@@ -331,21 +336,24 @@ class StackedAutoEncoders:
 
                 if self.parameters["HyperParameters"]["regularization"] == "l1":
                     model.add(Dense(units=proj_all_data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"],
                                     kernel_regularizer=regularizers.l1(
                                         self.parameters["HyperParameters"]["regularization_parameter"])))
 
                 elif self.parameters["HyperParameters"]["regularization"] == "l2":
                     model.add(Dense(units=proj_all_data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"],
                                     kernel_regularizer=regularizers.l2(
                                         self.parameters["HyperParameters"]["regularization_parameter"])))
                 else:
                     model.add(Dense(units=proj_all_data.shape[1], input_dim=hidden_neurons[layer - 1],
+                                    bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                                     kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
 
-                if bool(self.parameters["HyperParameters"]["dropout"]):
-                    model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
+#                 if bool(self.parameters["HyperParameters"]["dropout"]):
+#                     model.add(Dropout(int(self.parameters["HyperParameters"]["dropout_parameter"])))
 
                 model.add(Activation(self.parameters["HyperParameters"]["decoder_activation_function"]))
 
@@ -507,6 +515,7 @@ class StackedAutoEncoders:
 
             # Add Output Layer
             model.add(Dense(units=trgt_sparse.shape[1],
+                            bias_initializer=self.parameters["HyperParameters"]["bias_initializer"],
                             kernel_initializer=self.parameters["HyperParameters"]["kernel_initializer"]))
             model.add(Activation(self.parameters["HyperParameters"]["classifier_output_activation_function"]))
 
