@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 import seaborn
+import sklearn
 
 from sklearn import cross_validation
 from sklearn.externals import joblib
@@ -24,7 +25,7 @@ from keras.models import load_model
 import matplotlib.pyplot as plt
 
 from Functions.ClassificationAnalysis import CnnClassificationAnalysis
-from Functions.ConvolutionalNeuralNetworks import KerasModel
+from Functions.ConvolutionalNeuralNetworks import OldKerasModel
 from Functions.CrossValidation import SonarRunsKFold
 from Functions.NpUtils.DataTransformation import lofar2image
 from Functions.NpUtils.Scores import trigger_score, recall_score, spIndex, recall_score_novelty
@@ -466,7 +467,7 @@ class PCASVMNoveltyDetection(SVMNoveltyDetection):
 
 
 class CnnNoveltyAnalysis(object):
-    def __init__(self, ncv_obj, trn_params_mapping, package_name, analysis_name, class_labels, novelty_classes = None):
+    def __init__(self, ncv_obj, trn_params_mapping, package_name, analysis_name, class_labels, novelty_classes=None):
         if novelty_classes is None:
             novelty_classes = class_labels
 
@@ -498,7 +499,7 @@ class CnnNoveltyAnalysis(object):
                                            val_share=3)
                 for name, trnparams in trn_params_mapping.items():
                     path = self.resultspath + '/%s/' % nv_cls + trnparams.getParamPath() + '/' + cv_name
-                    model = KerasModel(trnparams)
+                    model = OldKerasModel(trnparams)
                     prediction = np.empty(10, dtype=np.ndarray)
                     for i_fold in os.listdir(path + '/best_states'):
                         fold_file = path + '/best_states/' + i_fold
@@ -568,9 +569,330 @@ class CnnNoveltyAnalysis(object):
 
         return max_column if max_value > v else np.argwhere(pd.isnull(x_out).values == True)[0][0]
 
+    @staticmethod
+    def _getTrigger(pd, predictions, novelty_cls, thres_array):
+        known_predictions = predictions.loc[pd.Label != novelty_cls]
+        trigger = np.empty_like(thres_array)
+        for i, t in enumerate(thres_array):
+            trigger_mask = known_predictions.values.max(axis=1) > t
+            correct_known_predictions = known_predictions.loc[trigger_mask]
+            trigger[i] = correct_known_predictions.shape[0] / float(known_predictions.shape[0])
+
+        return trigger
+
+    def _getEffs(self, pd, predictions, novelty_cls, thres_array):
+        eff_array = np.empty((len(self.class_labels) - 1, thres_array.shape[0]))
+        nv = np.empty_like(thres_array)
+        for cls in self.class_labels:
+            if cls == novelty_cls:
+                for i, t in enumerate(thres_array):
+                    nv_predictions = predictions.loc[pd.Label == cls]
+                    nv_mask = nv_predictions.values.max(axis=1) < t
+                    nv_eff = nv_predictions.loc[nv_mask].shape[0] / float(nv_predictions.shape[0])
+                    nv[i] = nv_eff
+            else:
+                for i, t in enumerate(thres_array):
+                    cls_predictions = predictions.loc[pd.Label == cls]
+                    known_mask = cls_predictions.values.max(axis=1) > t
+                    eff_mask = cls_predictions.loc[known_mask].values.argmax(axis=1) == cls - int(
+                        cls > novelty_cls)
+
+                    eff_cls = float(cls_predictions.loc[eff_mask].shape[0]) / \
+                              cls_predictions.shape[0]
+                    eff_array[cls - int(cls > novelty_cls), i] = eff_cls
+
+        return eff_array, nv
+
+    @staticmethod
+    def _getSp(eff_array, thres_array, n_known_classes):
+        sp = np.empty_like(thres_array)
+        for i, _ in enumerate(thres_array):
+            sp[i] = spIndex(eff_array[:, i], n_known_classes)
+
+        return sp
+
+    def _getScores(self, v_res, overwrite=False, zoom = (.90, .99), zoom_res_ratio=10):
+        if exists(self.an_path + '/' + 'scores.csv') and not overwrite:
+            self.scores = pd.read_csv(self.an_path + '/' + 'scores.csv',
+                                      index_col=[0, 1, 2, 3, 4])
+            return
+
+        thres_vals = np.linspace(.0, zoom[0], v_res, endpoint=False, dtype=np.float64)
+        thres_vals_zoom1 = np.linspace(zoom[0], zoom[1], zoom_res_ratio*v_res, endpoint=False, dtype=np.float64)
+        thres_vals_zoom2 = np.linspace(zoom[1], 1., zoom_res_ratio*v_res, dtype=np.float64)
+
+        thres_array = np.concatenate([thres_vals, thres_vals_zoom1, thres_vals_zoom2])
+
+        def _calcScores(g):
+            model_name, cv_name, novelty_cls, fold_str = g.name[0], g.name[1], g.name[2], g.name[3]
+
+            predictions = g.filter(regex=('Class*'))
+            predictions.drop(columns=self.class_labels[novelty_cls], inplace=True)
+
+            trigger = self._getTrigger(g, predictions, novelty_cls, thres_array)
+            eff_array, nv = self._getEffs(g, predictions, novelty_cls, thres_array)
+            sp = self._getSp(eff_array, thres_array, eff_array.shape[0])
+
+            return pd.DataFrame(np.vstack([trigger, sp, nv]),
+                                columns=thres_array,
+                                index=pd.Index(['trigger', 'sp', 'nv'], name='Score'))
+
+        predictions = self.nv_predictions.reset_index(level='Fold')
+        score_pd = predictions.groupby(by=['Model', 'CV', 'Novelty', 'Fold']).apply(_calcScores)
+        score_pd.to_csv(self.an_path + '/' + 'scores.csv', float_format='%.5f')
+
+        self.scores = score_pd
+
+    def getOpLevel(self, score):
+        scores = self.scores#
+
+        def _getOpArray(scores, nv_mat, op):
+            sup_fold_mask = nv_mat > op
+            inf_fold_mask = nv_mat <= op
+
+            # op_levels = np.empty(score_mat.shape[0])
+            # for i, (sup_fold_mask, inf_fold_mask, fold) in \
+            #         enumerate(zip(sup_nv_op_mask, inf_nv_op_mask, score_mat)):
+            sup_fold = scores[sup_fold_mask][0]
+            inf_fold = scores[inf_fold_mask][-1]
+            #
+            #     # if sup_fold/float(int_fold) < 0.8
+            #     # op_levels[i] = inf_fold
+            op_level = inf_fold
+            #op_level = (sup_fold + inf_fold) / 2
+            return op_level
+
+        def _getFoldOpLevels(g):
+            score_mat = g.xs(score, axis=0, level='Score', drop_level=True).values
+            nv_mat = g.xs('nv', axis=0, level='Score', drop_level=True).values
+
+            op = [0.0,0.50,0.75]
+
+            return pd.DataFrame(np.vstack([_getOpArray(score_mat, nv_mat, op_point)
+                                for op_point in op]),
+                                columns=[score], index=pd.Index(op, name='OP'))
+
+
+        op_pd = scores.groupby(level=['Model', 'CV', 'Novelty', 'Fold']).apply(_getFoldOpLevels)
+        return op_pd
+
+    def getOpLevels(self):
+        return pd.concat([self.getOpLevel(score)
+                          for score in self.scores.index.unique(level='Score')], axis=1)
+
+
+    def getAUCs(self):
+        scores = self.scores
+
+        def _getAucArray(scores):
+            thres = map(float, scores.columns.values)
+            auc = sklearn.metrics.auc(thres, scores.values.flatten())
+            return pd.DataFrame([auc], columns=['AUC'])
+        auc_pd = scores.groupby(level=['Model', 'CV', 'Novelty', 'Fold', 'Score']).apply(_getAucArray)
+        return auc_pd
+
+
+    def plotAUC(self):
+
+
+        op_pd = self.getAUCs()
+        means = op_pd.groupby(level=['CV', 'Model', 'Novelty', 'Score']).mean()
+        std = op_pd.groupby(level=['CV', 'Model', 'Novelty', 'Score']).std()
+        op_pd = pd.DataFrame({'mean': means['AUC'], 'std': std['AUC']})
+        op_pd.groupby(level=['CV', 'Score']).apply(self.plotHbar)
+
+    def plotHbar(self, g):
+        colors = ['#069af3', 'green', '#fac205', 'IndianRed']
+
+        names = [name for name in g.name]
+        indicator = names[-1]
+
+        def autolabel(rects, ax, g, xpos='center', ypos ='up'):
+            """
+            Attach a text label above each bar in *rects*, displaying its height.
+
+            *xpos* indicates which side to place the text w.r.t. the center of
+            the bar. It can be one of the following {'center', 'right', 'left'}.
+            """
+
+            xpos = xpos.lower()  # normalize the case of the parameter
+            ypos = ypos.lower()
+            va = {'center': 'center', 'top': 'bottom', 'bottom': 'top'}
+            ha = {'center': 'center', 'left': 'right', 'right': 'left'}
+            offset = {'center': 0.5, 'top': 0.57, 'bottom': 0.43}  # x_txt = x + w*off
+
+            for rect, std in zip(rects, g['std'].values):
+                width = rect.get_width()
+                ax.text(1.002 * width + 0.98 * std, rect.get_y() + rect.get_height() * offset[ypos],
+                        '{0:.2f}'.format(round(width,2)) + u'\u00b1' + '{0:.2f}'.format(round(std,2)),
+                        va=va[ypos], ha=ha[xpos], rotation=0)
+
+        ratio = 1/0.20
+
+        seaborn.set_style('white')
+        ind = 0.30*ratio*np.arange(len(g.index.unique(level='Model'))) # the x locations for the groups
+        nv_map = {'nv': 'Novelty Detection', 'trigger':'Trigger', 'sp':'SP'}
+        mod_map = {op_name: i for i, op_name in enumerate(g.index.unique(level='Novelty'))}
+        height = 0.30  # the width of the bars
+        n_models = 4
+
+        fig, ax = plt.subplots()
+        x_inf = 100
+        x_max = 0
+
+        def construct_bars(g, mod_map):
+
+            model_name = g.name
+            model_i = mod_map[model_name]
+            pos = ind + (model_i - n_models/2.0)*(height)
+            rect = ax.barh(pos, g['mean'].values, height, xerr=g['std'].values,
+                           color=colors[model_i], label=self.class_labels[model_name], linewidth=0,
+                            ecolor='black', capsize=0, error_kw={'elinewidth': 2.2})
+            autolabel(rect, ax, g, "right", "top")
+
+
+        g.groupby(level=['Novelty']).apply(construct_bars, mod_map)
+
+
+        min_mean = min(g['mean'].values)
+        max_mean = max(g['mean'].values)
+        min_mean_std = g.loc[g['mean'] == min_mean, 'std'].values
+        max_mean_std = g.loc[g['mean'] == max_mean, 'std'].values
+
+        x_margin = 0
+        x_low = (100 * (min_mean - min_mean_std) // 10) * 10 - x_margin
+        x_up = (100 * (max_mean + max_mean_std) // 10) * 10 + 10
+        x_inf = x_low/100 if x_low < x_inf else x_inf/100
+        x_max = min(x_up/100 if x_up > x_max else x_max/100, 100)
+
+        ax.set_xlim(x_inf, ax.get_xlim()[1])
+        ax.set_ylim(ind[0] - height*n_models/2 - 0.1,
+                    ind[-1] + height*n_models/2 + 0.80)
+        ax.set_title('%s AUC' % nv_map[indicator], fontsize=14, fontweight='bold')
+        ax.set_ylabel('Window Qt', fontsize=12, fontweight='semibold')
+
+        ax.set_xlabel('AUC', fontsize=12, fontweight='semibold')
+        ax.set_xticks(np.linspace(x_inf, x_max, 5, endpoint=True))
+        ax.set_yticks(ind)
+        ax.set_yticklabels(np.unique(g.index.unique(level='Model').values[::-1]))
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+
+        ax.xaxis.grid(True)
+        ax.legend(title='Novelty Class', fontsize='medium', markerscale=0.7,
+                  frameon=True, fancybox=True, shadow=True,
+                  bbox_to_anchor=(0.0,1.025), loc="upper left", ncol=4)
+        fig.tight_layout()
+        str_list = map(lambda x: x + '/', names)
+        path = self.an_path + '/' + ''.join(str_list[:-1])
+        if not exists(path):
+            mkdir(path)
+        print indicator
+        fig.savefig(path + '/auc_' + indicator + '.pdf')
+
+
+    def Hbar(self, score):
+        def autolabel(rects, ax, g, xpos='center', ypos ='up'):
+            """
+            Attach a text label above each bar in *rects*, displaying its height.
+
+            *xpos* indicates which side to place the text w.r.t. the center of
+            the bar. It can be one of the following {'center', 'right', 'left'}.
+            """
+
+            xpos = xpos.lower()  # normalize the case of the parameter
+            ypos = ypos.lower()
+            va = {'center': 'center', 'top': 'bottom', 'bottom': 'top'}
+            ha = {'center': 'center', 'left': 'right', 'right': 'left'}
+            offset = {'center': 0.5, 'top': 0.57, 'bottom': 0.43}  # x_txt = x + w*off
+
+            for rect, std in zip(rects, g['std'].values):
+                width = rect.get_width()
+                ax.text(1.01 * width, rect.get_y() + rect.get_height() * offset[ypos],
+                        '{0:.2f}'.format(round(width,2)) + u'\u00b1' + '{0:.2f}'.format(round(std,2)),
+                        va=va[ypos], ha=ha[xpos], rotation=0)
+
+        op_pd = self.getOpLevels().loc[:, score]
+        means = op_pd.groupby(level=['Model', 'CV', 'Novelty', 'OP']).mean()
+        std = op_pd.groupby(level=['Model', 'CV', 'Novelty', 'OP']).std()
+
+        op_pd = pd.DataFrame({'mean': 100* means, 'std': 100 * std})
+
+
+        def _Hbar(g):
+            colors = ['#069af3', 'IndianRed', '#76cd26']
+
+            cv, novelty_cls = g.name[0], g.name[1]
+
+            seaborn.set_style('white')
+            ind = np.arange(len(g.index.unique(level='Model'))) # the x locations for the groups
+            mod_map = {op_name: i for i, op_name in enumerate(g.index.unique(level='OP'))}
+            height = 0.20  # the width of the bars
+            n_models = 3
+
+            fig, ax = plt.subplots()
+            x_inf = 100
+
+            def construct_bars(g, mod_map):
+
+                model_name = g.name
+                model_i = mod_map[model_name]
+                pos = ind + (model_i - n_models/2.0)*(height)
+                rect = ax.barh(pos, g['mean'].values, height, xerr=g['std'].values,
+                               color=colors[model_i], label=model_name, linewidth=0,
+                                ecolor='black', capsize=0, error_kw={'elinewidth': 2.2})
+                autolabel(rect, ax, g, "right", "top")
+
+
+            g.groupby(level=['OP']).apply(construct_bars, mod_map)
+
+
+            min_mean = min(g['mean'].values)
+            min_mean_std = g.loc[g['mean'] == min_mean, 'std'].values
+
+            x_margin = 10
+            x_low = ((min_mean - min_mean_std) // 10) * 10 - x_margin
+            x_inf = x_low if x_low < x_inf else x_inf
+
+            ax.set_xlim(x_inf, ax.get_xlim()[1] + 10)
+            ax.set_ylim(ind[0] - height*n_models/2 - 0.1,
+                        ind[-1] + height*n_models/2 + 0.70)
+            ax.set_title('%s as Novelty' % self.class_labels[novelty_cls], fontsize=14, fontweight='bold')
+            ax.set_ylabel('Window Qt', fontsize=12, fontweight='semibold')
+
+            if score is not 'sp':
+                fancy_score = '%s' % (score.upper()[0] + score.lower()[1:]) + ' (%)'
+            else:
+                fancy_score = 'SP'
+
+            ax.set_xlabel(fancy_score, fontsize=12, fontweight='semibold')
+            ax.set_xticks(np.arange(x_inf, 101, 10))
+            ax.set_yticks(ind)
+            ax.set_yticklabels(np.unique(g.index.unique(level='Model').values[::-1]))
+
+            ax.spines['top'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+
+            ax.xaxis.grid(True)
+            ax.legend(title='Novelty Detection Rate', fontsize='medium', markerscale=0.7,
+                      frameon=True, fancybox=True, shadow=True,
+                      bbox_to_anchor=(0.0,1.025), loc="upper left", ncol=3)
+            fig.tight_layout()
+            path = self.an_path + '/' + cv + '/' + score
+            if not exists(path):
+                mkdir(path)
+            fig.savefig(path + '/' + self.class_labels[novelty_cls] + '.svg')
+
+        op_pd.groupby(level=['CV', 'Novelty']).apply(_Hbar)
+
     def _getThresGrid(self, v_resolution):
         threshold_values = np.linspace(.0, 1., v_resolution, dtype=np.float16)
-        threshold_values_zoom = np.linspace(.95, 1., v_resolution, dtype=np.float16)
+        threshold_values_zoom = np.linspace(.90, 1., v_resolution, dtype=np.float16)
         if not exists(self.an_path + '/%i_threshold_pd.csv' % v_resolution):
             threshold_pd = pd.DataFrame(np.array([self.nv_predictions.apply(lambda x: self._get_class_int(x, t), axis=1)
                                                   for t in threshold_values]).T,
@@ -621,13 +943,15 @@ class CnnNoveltyAnalysis(object):
                     known_cls = [value for value in self.class_labels.keys() if value != novelty_cls]
 
                     nv_rate_matrix = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
-                                              .apply(lambda x: recall_score(group['Label'].values,
-                                                                            x.values)[novelty_cls], axis=0)
+                                              .apply(lambda x: recall_score_novelty(group['Label'].values,
+                                                                            x.values,  novelty_cls,
+                                                    self.class_labels)[novelty_cls], axis=0)
                                                for name, group in folds_thresh_pd.groupby(level='Fold')])
 
                     nv_rate_matrix_zoom = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
-                                                   .apply(lambda x: recall_score(group['Label']
-                                                                                 .values, x.values)[novelty_cls], axis=0)
+                                                   .apply(lambda x: recall_score_novelty(group['Label']
+                                                                                 .values, x.values, novelty_cls,
+                                                    self.class_labels)[novelty_cls], axis=0)
                                                     for name, group in folds_thresh_pd_zoom.groupby(level='Fold')])
 
                     nv_rate_stats = pd.DataFrame({'mean': nv_rate_matrix.mean(axis=0),
@@ -819,11 +1143,11 @@ class CnnNoveltyAnalysis(object):
                     nv_rate_stats_zoom = pd.DataFrame({'mean': nv_rate_matrix_zoom.mean(axis=0),
                                                        'std': nv_rate_matrix_zoom.std(axis=0)})
 
-                    auc_x = np.concatenate([threshold_values[threshold_values < 0.95],
+                    auc_x = np.concatenate([threshold_values[threshold_values < 0.90],
                                             threshold_values_zoom])
-                    auc_sp_y = np.hstack([trigger_matrix[:, threshold_values < 0.95],
+                    auc_sp_y = np.hstack([trigger_matrix[:, threshold_values < 0.90],
                                           trigger_matrix_zoom[:, :]])
-                    auc_nv_y = np.hstack([nv_rate_matrix[:, threshold_values < 0.95],
+                    auc_nv_y = np.hstack([nv_rate_matrix[:, threshold_values < 0.90],
                                           nv_rate_matrix_zoom[:, :]])
 
                     sp_auc = np.apply_along_axis(lambda x: auc(auc_x, x), axis=1, arr=auc_sp_y)
@@ -879,7 +1203,7 @@ class CnnNoveltyAnalysis(object):
                         .mask('Novelty', novelty_cls)
                     print model_name
                     print  novelty_cls
-                    for v in [0.0, 0.5]:
+                    for v in [0.0]:
                         self.trigger_zero = trigger_stats['mean'][nv_rate_stats['mean'] <= v].values
                         self.nv_rate_stats = nv_rate_stats
                         lin_mean = (trigger_stats['mean'][nv_rate_stats['mean'].values > v].values[0] +
@@ -891,7 +1215,7 @@ class CnnNoveltyAnalysis(object):
                         # print trigger_stats['std'][nv_rate_stats['mean'].values <= v]
                         print '\t%.2f:\t ' % v + \
                               '%f +- %f' % (lin_mean, lin_std)
-                    for v in [0.75]:
+                    for v in [0.5, 0.75]:
                         lin_mean = (trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values > v].values[0] +
                                     trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values <= v].values[-1]) / 2
                         lin_std = (trigger_stats_zoom['std'][nv_rate_stats_zoom['mean'].values > v].values[0] +
@@ -927,7 +1251,7 @@ class CnnNoveltyAnalysis(object):
                     print model_name
                     print  novelty_cls
                     for v in [0.0, 0.5, 0.75]:
-                        if v in [0.0, 0.5]:
+                        if v in [0.0] or (v in [0.5] and novelty_cls != 3):
                             self.trigger_zero = trigger_stats['mean'][nv_rate_stats['mean'] <= v].values
                             self.nv_rate_stats = nv_rate_stats
                             lin_mean = (trigger_stats['mean'][nv_rate_stats['mean'].values > v].values[0] +
@@ -938,7 +1262,8 @@ class CnnNoveltyAnalysis(object):
                             print '\t%.2f:\t ' % v + \
                                   '%f +- %f' % (lin_mean, lin_std)
 
-                        if v in [0.75]:
+                        elif v in [0.5, 0.75]:
+                            print trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values > v].values
                             lin_mean = (trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values > v].values[0] +
                                         trigger_stats_zoom['mean'][nv_rate_stats_zoom['mean'].values <= v].values[-1]) / 2
                             lin_std = (trigger_stats_zoom['std'][nv_rate_stats_zoom['mean'].values > v].values[0] +
@@ -1106,7 +1431,6 @@ class CnnNoveltyAnalysis(object):
                     plt.close(fig)
 
     def plotOpLevels(self, v_res):
-
         def autolabel(rects, ax, model_op, xpos='center', ypos = 'up'):
             """
             Attach a text label above each bar in *rects*, displaying its height.
@@ -1161,7 +1485,7 @@ class CnnNoveltyAnalysis(object):
                 ax.set_ylim(ind[0] - height*n_models/2 - 0.1,
                             ind[-1] + height*n_models/2 + 0.55)
                 ax.set_title('%s as Novelty' % self.class_labels[novelty_cls], fontsize=14, fontweight='bold')
-                ax.set_ylabel('Model', fontsize=12, fontweight='semibold')
+                ax.set_ylabel('Window Qt', fontsize=12, fontweight='semibold')
                 ax.set_xlabel('Trigger (%)', fontsize=12, fontweight='semibold')
                 ax.set_xticks(np.arange(x_inf, 101, 10))
                 ax.set_yticks(ind)

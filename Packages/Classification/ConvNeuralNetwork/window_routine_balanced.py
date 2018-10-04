@@ -5,7 +5,7 @@ from Functions.DataHandler import DataBalancer
 sys.path.extend(['/home/pedrolisboa/Workspace/lps/SonarAnalysis/'])
 
 from Functions.TrainFunctions import ConvolutionTrainFunction
-from Functions.ConvolutionalNeuralNetworks import KerasModel
+from Functions.ConvolutionalNeuralNetworks import OldKerasModel
 from Functions.TrainParameters import TrnParamsConvolutional
 import os
 from Functions.CrossValidation import NestedCV, SonarRunsCV
@@ -100,7 +100,7 @@ for cv_name, cv in ncv.cv.items():
 
 
         cvt = ConvolutionTrainFunction()
-        cvt.loadModels([trnparams], KerasModel)
+        cvt.loadModels([trnparams], OldKerasModel)
         cvt.loadData(dataset)
         cvt.loadFolds(cv)
         cvt.train(transform_fn=transform_fn, scaler=None,

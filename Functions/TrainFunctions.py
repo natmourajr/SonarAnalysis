@@ -1377,7 +1377,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
     def loadData(self, dataset):
         """Load dataset for model use
-
         Args:
         dataset(tuple): (samples, labels, unique(labels))
         """
@@ -1457,16 +1456,19 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         else:
             novelty_path_offset = ''
 
-        if model.status == 'Untrained':
-            model_history = np.empty(self.n_folds, dtype=np.ndarray)
-            model_predictions = np.empty(self.n_folds, dtype=np.ndarray)
-        else:
-            model_history = np.load(model.model_recovery_history)
-            model_predictions = np.load(model.model_recovery_predictions)
-        trained_folds = map(self._parseFoldNumber, model.trained_folds_files)
+        # if model.status == 'Untrained':
+        model_history = np.empty(self.n_folds, dtype=np.ndarray)
+        model_predictions = np.empty(self.n_folds, dtype=np.ndarray)
+        # else:
+            # model_history = np.load(model.model_recovery_history)
+            # model_predictions = np.load(model.model_recovery_predictions)
 
-        print model.status
-        print trained_folds
+        #trained_folds = map(self._parseFoldNumber, model.trained_folds_files[3])[0]
+        #trained_folds = self._parseFoldNumber(model.trained_folds_files[3])
+
+        #print model.status
+        # print trained_folds
+        trained_folds = []
 
         for fold_count, (train_index, test_index) in enumerate(self.fold_config):
             if fold_count in trained_folds:
@@ -1560,9 +1562,14 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         os.remove(model.model_recovery_history)
         return model_history, model_predictions
 
-    @staticmethod
-    def _parseFoldNumber(fold_str):
+
+    def _parseFoldNumber(self, fold_str):
+        print fold_str
+        if fold_str == 'ClassC':
+            list = os.listdir(self.models[0].model_files + '/' +  fold_str)
+            return map(self._parseFoldNumber, list)
         warn("Limit : [0,9]!")
+
         return int(fold_str[0])
 
     # @staticmethod
@@ -1629,3 +1636,165 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         print cls_indices
         return {cls_index: float(min_class) / cls_count
                 for cls_index, cls_count in zip(cls_indices, event_count)}
+
+
+
+class GridSearchCV():
+    def __init__(self, novelty_detection = False, nested_cv = False, store_results=True):
+        pass
+
+class NoveltyDetetionCV():
+    def __init__(self, novelty_classes, novelty_path):
+        self.novelty_classes = novelty_classes
+
+class CVIterator():
+    def __init__(self, cv, all_data, all_trgt, verbose=1):
+        self.cv = cv
+        self.verbose = verbose
+        self.all_data = all_data
+        self.all_trgt = all_trgt
+
+    def __iter__(self):
+        return self.next()
+
+    def next(self):
+        for i_fold, (train, test) in enumerate(self.cv):
+            X = self.all_data[train]
+            y = self.all_trgt[train]
+
+            X_test = self.all_data[test]
+            y_test = self.all_trgt[test]
+            validation_data = (X_test, y_test)
+
+            if self.verbose:
+                print('Fold %i' % i_fold)
+                print('\tTrain: %s' % X.shape)
+                print('\tTest: %s' % X_test.shape)
+
+            yield X, y, validation_data
+        raise StopIteration
+
+    def apply(self, pipeline):
+        return [pipeline.apply(X, y, validation_data) for X,y, validation_data in self]
+
+
+class Pipeline:
+    def __init__(self, steps):
+        self.steps = steps
+        self._validate_steps()
+
+    def _validate_steps(self):
+        names, estimators = zip(*self.steps)
+
+        # validate estimators
+        transformers = estimators[:-1]
+        estimator = estimators[-1]
+
+        for t in transformers:
+            if t is None:
+                continue
+            if (not (hasattr(t, "fit") or hasattr(t, "fit_transform")) or not
+            hasattr(t, "transform")):
+                raise TypeError("All intermediate steps should be "
+                                "transformers and implement fit and transform."
+                                " '%s' (type %s) doesn't" % (t, type(t)))
+
+        # Allow last estimator to be None as an identity transformation
+        if estimator is not None and not hasattr(estimator, "fit"):
+            raise TypeError("Last step of Pipeline should implement fit. "
+                            "'%s' (type %s) doesn't"
+                            % (estimator, type(estimator)))
+
+    def _fit_transformers(self, X, y):
+        names, estimators = zip(*self.steps)
+        transformers = estimators[:-1]
+
+        for t in transformers:
+            t.fit(X, y)
+
+    def _transform(self, X, y):
+        names, estimators = zip(*self.steps)
+        transformers = estimators[:-1]
+
+        X_t, y_t = X, y
+        for t in transformers:
+            X_t, y_t, val_t = t.transform(X_t, y_t)
+
+        return X_t, y_t
+
+    def fit(self, X, y, validation_data=None):
+        self._fit_transformers(X, y)
+        X_t, y_t = self.transform(X, y)
+        if validation_data is not None:
+            val_t_0, val_t_1 = self._transform(validation_data[0],
+                                              validation_data[1])
+            val_t = (val_t_0, val_t_1)
+        else:
+            val_t = None
+        self.final_estimator.fit(X_t, y_t, val_t)
+
+    @property
+    def final_estimator(self):
+        return self.steps[-1][1]
+
+    def predict(self, X, y = None, transform = True):
+        if transform:
+            X_t, _, _  = self._transform(X, y, None)
+        return self.final_estimator.predict(X_t)
+
+
+class CNNTraining(ConvolutionPaths):
+    def __init__(self, model, saved_best_path = None, saved_state_path=None):
+        # Path variables
+        super(ConvolutionTrainFunction, self).__init__()
+
+        self.model = model
+        self.saved_best_path = saved_best_path
+        self.saved_state_path = saved_state_path
+
+    def train(self, X, y, validation_data=None, class_weights=True, verbose=(0, 0, 0)):
+        data, trgt, class_labels = self.dataset
+
+        model = self.model
+
+        start = time.time()
+        model_results = self._fitModel(model,
+                                       X,
+                                       y,
+                                       validation_data,
+                                       class_labels,
+                                       class_weights = class_weights,
+                                       verbose=verbose[1])
+        if verbose[0]:
+            end = time.time()
+            print 'Training: %i (seg) / %i (min) /%i (hours)' % (
+            end - start, (end - start) / 60, (end - start) / 3600)
+
+    def _fitModel(self, model, X, y, validation_data=None, verbose=False, class_weights=True):
+        if class_weights:
+            class_weights = self._getGradientWeights(y, mode='standard')
+            if verbose:
+                print "Class Weights:"
+                for cls in class_weights:
+                    print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+        else:
+            class_weights = None
+
+        if not self.saved_best_path is None:
+            pass
+
+        model.callbacks.add(callbacks.ModelCheckpoint(self.saved_best_path,
+                                              monitor='val_loss', mode='min', verbose=1, save_best_only=True))
+
+        model.callbacks.add(callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=1, mode='min'))
+
+        model.build()
+        model.fit(X, y,
+                  validation_data=validation_data, callbacks = [],
+                  class_weight=class_weights, verbose=verbose,
+                  max_restarts=4, restart_tol=0.60)
+
+        if not self.saved_state_path is None:
+            model.save(self.saved_state_path)
+
+        return model

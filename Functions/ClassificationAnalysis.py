@@ -26,7 +26,7 @@ from keras import backend as backend
 
 import matplotlib.pyplot as plt
 
-from Functions.ConvolutionalNeuralNetworks import KerasModel
+from Functions.ConvolutionalNeuralNetworks import OldKerasModel
 from Functions.FunctionsDataVisualization import plotConfusionMatrix, plotLOFARgram
 from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
 from Functions.NpUtils.Scores import recall_score, spIndex
@@ -899,6 +899,7 @@ class ModelDataCollection:
             index = pd.MultiIndex.from_tuples(model_scores.keys(), names=['CV', 'Fold'])
             model_scores = pd.DataFrame(model_scores.values(), index=index)
             return model_scores
+
         model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs.items()], axis=0)
         return model_scores
 
@@ -991,12 +992,12 @@ class ModelDataCollection:
             plt.close(fig)
 
     def plotRunsPredictions(self, data, trgt, overwrite=False):
-        k_model = KerasModel(self.params)
+        k_model = OldKerasModel(self.params)
         window_size = self.params.input_shape[0]
         for cv_name, cv in self.trained_cvs.items():
             k_model.selectFoldConfig(10, mode=cv_name)
 
-            outputpath = self.an_path + '/%s/outputs/pred_maps' % (cv_name)
+            outputpath = self.an_path + '/%s/outputs/pred_maps' % cv_name
 
             for i_fold, (_, test_index) in enumerate(cv):
                 k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
@@ -1042,11 +1043,66 @@ class ModelDataCollection:
                     plt.cla()
                     plt.close(fig)
 
+    def plotNoveltyRunsPredictions(self, data, trgt, op, novelty_cls, overwrite=False):
+        k_model = OldKerasModel(self.params)
+        window_size = self.params.input_shape[0]
+        for cv_name, cv in self.trained_cvs.items():
+            k_model.selectFoldConfig(10, mode=cv_name)
+
+            outputpath = self.an_path + '/%s/outputs/pred_maps' % cv_name
+
+            for i_fold, (_, test_index) in enumerate(cv):
+                k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
+
+                x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
+
+                preds = k_model.predict(x_test)
+                p_test = preds.argmax(axis=1)
+                p_test[preds.max(axis=1) < op] = novelty_cls
+
+                for cls_i, cls_str in self.class_labels.items():
+                    run = x_test[y_test == cls_i]
+                    run_trgt = y_test[y_test == cls_i]
+                    run_p = p_test[y_test == cls_i]
+                    print i_fold
+                    print 'Eff %s' % cls_i
+                    print sum(run_p == run_trgt)/float(len(run_trgt))
+                    # TODO pass this to NestedCV and recover here as an attribute
+                    ship_name = [ship_name
+                                 for ship_name, ship_indices in self.n_cv.info.runs_named[cls_str].items()
+                                 if np.isin(test_index, ship_indices).any()]
+                    fig = plt.figure(figsize=(10,10))
+                    ax = plt.gca()
+                    print ship_name
+
+                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+
+                    mask = np.concatenate([p * np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
+                                           for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
+                    from matplotlib import colors
+                    cmap = colors.ListedColormap(['red', 'blue'])
+                    bounds = [0, 0.5, 1]
+                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                    x = ax.imshow(mask[:, :, 0], alpha=.35, cmap=cmap,#plt.get_cmap('coolwarm_r', 2),
+                              extent=[1, mask.shape[1], mask.shape[0], 1],
+                              aspect="auto", vmin=0, vmax=1)
+                    # plt.colorbar(x, ax=ax, ticks=[0,1], boundaries=bounds)
+
+                    filepath = outputpath + '/%s' % cls_str
+                    if not exists(filepath):
+                        mkdir(filepath)
+                    else:
+                        pass
+
+                    fig.savefig(filepath + '/%i_fold_%s' % (i_fold, ship_name))
+                    plt.cla()
+                    plt.close(fig)
+
     def plotLayerOutputs(self, data, trgt, layers_id, overwrite=False):
         def reconstructRun(input, n_layer):
             return k_model.get_layer_n_output(n_layer, input)
 
-        k_model = KerasModel(self.params)
+        k_model = OldKerasModel(self.params)
         window_size = self.params.input_shape[0]
         for cv_name, cv in self.trained_cvs.items():
             k_model.selectFoldConfig(10, mode=cv_name)
@@ -1093,7 +1149,7 @@ class ModelDataCollection:
             for i_fold, (train_index, test_index) in enumerate(cv):
                 x_test, fold_trgt = lofar2image(data, trgt, test_index,
                                                 image_window, image_window, run_indices_info=run_info)
-                model = KerasModel(self.params)
+                model = OldKerasModel(self.params)
                 print fold_path + '/best_states/' + '/%i_fold.h5' % i_fold
                 model.load(fold_path + '/best_states/' + '/%i_fold.h5' % i_fold)
                 prediction = model.predict(x_test)

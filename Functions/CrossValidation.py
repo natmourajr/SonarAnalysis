@@ -45,6 +45,14 @@ class NestedCV:
         self.cv_filemask = cv_filemask
         self.info = SonarRunsInfo(self.audiodatapath)
 
+    def __iter__(self):
+        return self.next()
+
+    def next(self):
+        for cv_name, cv in self.cv.items():
+            yield cv_name, cv
+        raise StopIteration
+
     def createCVs(self, data, trgt):
         self.cv = {self.cv_filemask + '%i' % cv_i: list(SonarRunsCV(self.n_folds, self.audiodatapath).split(data,trgt))
                    for cv_i in range(self.n_cvs)}
