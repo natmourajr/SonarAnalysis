@@ -116,12 +116,12 @@ class Lofar2Image(TransformerMixin):
                 for run_name, run in cls_runs.items():
                     run_data, run_trgt = self.all_data[run], self.all_trgt[run]
                     cls_i = np.unique(run_trgt)[0]
-                    lofar = lofar_data[lofar_trgt == cls_i]
+                    # lofar = lofar_data[lofar_trgt == cls_i]
                     # print cls_i
                     # print np.isin(run_data, lofar, assume_unique=True).any(axis=1)
                     # print run_data.shape
                     # print lofar.shape
-                    if np.isin(run_data, lofar, assume_unique=True).all(axis=1).all():
+                    if np.isin(run_data, lofar_data, assume_unique=False).all(axis=1).all():
                         yield (cls_i, run_name), run_data
 
     # def _getClsFromRunName(self, run_name):
@@ -154,23 +154,35 @@ class Lofar2Image(TransformerMixin):
             y = y.argmax(axis=1)
         else:
             self.sparse_format = False
-        separated_runs = OrderedDict({(run_trgt, run_name): run_data
-                                      for (run_trgt, run_name), run_data in self.extractRuns(X, y)})
-        self.separated_runs = separated_runs
+
+        self.y = y
 
         return self
 
     def transform(self, X, y=None):
+        if y is None:
+            y = self.y
+        # if X.shape[0] != y.shape[0]:
+        #     print X.shape
+        #     print y.shape
+        #     raise ValueError
+        separated_runs = OrderedDict({(run_trgt, run_name): run_data
+                                      for (run_trgt, run_name), run_data in self.extractRuns(X, y)})
+
         if self.verbose:
             print "Runs found"
             for key in self.separated_runs.keys():
                 print key
 
         image_X, image_y = self._genImageDataset([(trgt, run)
-                                                 for (trgt, _), run in self.separated_runs.items()])
+                                                 for (trgt, _), run in separated_runs.items()])
 
         # print image_X.shape
         # print image_y.shape
+
+        print 'image shape'
+        print image_X.shape
+        print image_y.shape
 
         if self.channel_dim == 'first':
             image_X = image_X[np.newaxis, :, :, :]

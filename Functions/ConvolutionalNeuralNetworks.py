@@ -1314,8 +1314,8 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
                           steps_per_epoch=steps_per_epoch,
                           validation_steps=validation_steps)
 
-                import keras.backend as K
-                K.clear_session()
+            import keras.backend as K
+            K.clear_session()
                 # print "After Training"
                 # print model.model.get_weights()
                 # print before == model.model.optimizer.weights
