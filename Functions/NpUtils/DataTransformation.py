@@ -2,6 +2,7 @@
 This module contains utilities to handle and transform lofar data
 """
 import contextlib
+import gc
 import warnings
 import wave
 from collections import OrderedDict
@@ -192,6 +193,7 @@ class Lofar2Image(TransformerMixin):
         #if self.sparse_format:
         image_y = to_categorical(image_y)
 
+        gc.collect()
         return image_X, image_y
     #
     # def gen_new_cv(self, all_data, all_trgt, cv):
