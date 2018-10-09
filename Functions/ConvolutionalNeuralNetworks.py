@@ -886,6 +886,7 @@ class ConvNetClassifier(BaseNNClassifier):
                  pool_strides=((1, 1),),
                  conv_activations=("relu",),
                  conv_padding=('valid',),
+                 conv_dropout=None,
                  pool_padding=('valid',),
                  pool_types=('MaxPooling',),
                  conv_dilation_rate=(1,),
@@ -893,6 +894,7 @@ class ConvNetClassifier(BaseNNClassifier):
                  data_format = 'channels_last',
                  dense_layer_sizes=(10,),
                  dense_activations=("relu",),
+                 dense_dropout=None,
                  solver="adam",
                  batch_size=32,
                  epochs=200,
@@ -1024,6 +1026,12 @@ class ConvNetClassifier(BaseNNClassifier):
                                                self.kernel_constraint,
                                                self.bias_constraint)
                         for units, activation in zip(self.dense_layer_sizes, self.dense_activations)]
+
+        if self.dense_dropout is not None:
+            dropout_pos = {pos+1: keras.layers.Dropout(rate)
+                           for pos, rate in enumerate(self.dense_dropout) if rate is not None}
+            for pos, drop_layer in dropout_pos.items():
+                dense_layers.insert(pos, drop_layer)
 
         layers = np.concatenate([conv_pool_layers, dense_layers])
 

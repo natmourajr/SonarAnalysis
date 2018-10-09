@@ -3,6 +3,7 @@ This module contains utilities to handle and transform lofar data
 """
 import contextlib
 import gc
+import os
 import warnings
 import wave
 from collections import OrderedDict
@@ -10,9 +11,10 @@ from collections import OrderedDict
 import keras
 import numpy as np
 from keras.utils import to_categorical
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.utils.validation import check_memory
 
-from Functions.SystemIO import listfolders, listfiles
+from Functions.SystemIO import listfolders, listfiles, load, exists, save
 
 
 def trgt2categorical(trgt, n_classes):
@@ -77,9 +79,9 @@ class Scaler:
         pass
 
 
-class Lofar2Image(TransformerMixin):
+class Lofar2Image(BaseEstimator, TransformerMixin):
     def __init__(self, all_data, all_trgt, window_size, stride, run_indices_info,
-                 filepath = None, channel_axis='last', dtype=np.float64, verbose=0):
+                 filepath = None, channel_axis='last', dtype=np.float64, verbose=0, memory=None):
         super(Lofar2Image, self).__init__()
         self.window_size = window_size
         self.run_indices_info = run_indices_info
@@ -90,9 +92,12 @@ class Lofar2Image(TransformerMixin):
         self.all_trgt = all_trgt
         self.verbose = verbose
 
+        self.memory = memory
         self.pruned_indexes = None
         self.data_shape = None
 
+        if channel_axis is None:
+            channel_axis = 'last'
         if not channel_axis.lower() in ['first', 'last', 'none']:
             warnings.warn('Desired channel dimension is invalid, '
                           'fallback to last dimension.',
@@ -161,6 +166,13 @@ class Lofar2Image(TransformerMixin):
         return self
 
     def transform(self, X, y=None):
+        memory = check_memory(self.memory)
+
+        _transform_cached = memory.cache(self._transform)
+
+        return _transform_cached(X, y)
+
+    def _transform(self, X, y=None):
         if y is None:
             y = self.y
         # if X.shape[0] != y.shape[0]:
@@ -194,6 +206,7 @@ class Lofar2Image(TransformerMixin):
         image_y = to_categorical(image_y)
 
         gc.collect()
+
         return image_X, image_y
     #
     # def gen_new_cv(self, all_data, all_trgt, cv):

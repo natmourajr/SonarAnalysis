@@ -52,7 +52,8 @@ cv = load('/home/pedrolisboa/Workspace/lps/SonarAnalysis/Results/10_folds_cv_run
 
 
 scaler = StandardScaler()
-lofar2image = Lofar2Image(all_data,all_trgt, 10, 10, run_indices_info, filepath=None, channel_axis='last')
+lofar2image = Lofar2Image(all_data,all_trgt, 15, 10, run_indices_info, filepath=None, channel_axis='last',
+                          memory=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
 
 cnn_clf = ConvNetClassifier(LofarObj=lofar2image,
@@ -66,7 +67,7 @@ cnn_clf = ConvNetClassifier(LofarObj=lofar2image,
                             pool_padding=("valid",),
                             dense_layer_sizes=(10,4),
                             dense_activations=("tanh", "softmax"),
-                            epochs=200)
+                            epochs=100)
 # data, trgt, cv = lofar2image.gen_new_cv(all_data, all_trgt, cv)
 
 # save(data, './data')
@@ -76,21 +77,26 @@ cnn_clf = ConvNetClassifier(LofarObj=lofar2image,
 # raise NotImplementedError
 pipe = ExtendedPipeline(steps=[('lofar2image', lofar2image),
                                # ('scaler', scaler),
-                               ('clf', cnn_clf)],
-                        memory=os.path.join(results_path, 'Low_Param_Analysis'))
+                               ('clf', cnn_clf)])#,
+                        #memory=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
+import keras.regularizers
 gs = PersGridSearchCV(estimator=pipe,
-                      param_grid={"lofar2image__window_size": [10, 15, 20, 25, 30]},
+                      param_grid={"clf__kernel_regularizer": [None, keras.regularizers.l2()],
+                                  "clf__dense_dropout": [None, (0.8,), (0.6,), (0.5,), (0.3,)],
+                                  "clf__n_filters": [(6,), (9, )],
+                                  "clf__conv_activations": [("tanh",)],
+                                  "clf__dense_layer_sizes": [(10,4), (20, 4), (30, 4)]},
                       cv=cv,
                       verbose=1,
-                      cachedir=os.path.join(results_path, 'Low_Param_Analysis'))
+                      cachedir=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
 # print list(cv.split(X,y))
 # print list(cv.split(X,y))
 # raise NotImplementedError
 y = to_categorical(all_trgt, 4)
 gs.fit(all_data, all_trgt, clf__validation_split=0.1, clf__class_weight=True, clf__n_inits=2, clf__verbose=1)
-pd.DataFrame(gs.cv_results_).to_csv(os.path.join(results_path, 'Low_Param_Analysis/gs_results.csv'))
+pd.DataFrame(gs.cv_results_).to_csv(os.path.join(results_path, 'Low_Param_Analysis_Topology/gs_results.csv'))
 gs.best_estimator_._final_estimator.plotTraining(train_scores=['loss'],
                                                  val_scores=['val_loss'])
 
