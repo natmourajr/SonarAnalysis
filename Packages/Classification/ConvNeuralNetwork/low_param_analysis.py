@@ -1,4 +1,9 @@
 import sys
+
+import sklearn
+
+from Functions.NpUtils.Scores import spIndex, recall_score, estimator_sp_index, estimator_recall_score, sp_index
+
 sys.path.extend(['/home/pedrolisboa/Workspace/lps/LpsToolbox'])
 
 from lps_toolbox.pipeline import ExtendedPipeline
@@ -79,11 +84,17 @@ pipe = ExtendedPipeline(steps=[('lofar2image', lofar2image),
                                ('clf', cnn_clf)],
                         memory=os.path.join(results_path, 'Low_Param_Analysis'))
 
+def make_scorer(estimator, y, y_pred):
+    new_y = estimator.transform()
+
 gs = PersGridSearchCV(estimator=pipe,
                       param_grid={"lofar2image__window_size": [10, 15, 20, 25, 30]},
                       cv=cv,
                       verbose=1,
-                      cachedir=os.path.join(results_path, 'Low_Param_Analysis'))
+                      # scoring={'recall'},
+                      # refit=False,
+                      cachedir=os.path.join(results_path, 'Low_Param_Analysis'),
+                      return_estimator=True)
 
 # print list(cv.split(X,y))
 # print list(cv.split(X,y))

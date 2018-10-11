@@ -652,7 +652,8 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         # yt = yt.argmax(axis=1)
         cat_out = out.argmax(axis=1)
         return spIndex(recall_score(y, cat_out),
-                       n_classes=len(np.unique(y)))
+                      n_classes=len(np.unique(y)))
+        # return recall_score(y, cat_out)
 
     @staticmethod
     def _getGradientWeights(y_train, mode='standard'):

@@ -4,6 +4,14 @@ This module contains metrics implemented using numpy and sklearn utilities
 import numpy as np
 import sklearn
 
+def sp_index(y, y_pred):
+    if y.ndim > 1:
+        y = y.argmax(axis=1)
+    n_classes = len(np.unique(y))
+    recall = recall_score(y, y_pred)
+    return np.sqrt(np.sum(recall) / n_classes *\
+                   np.power(np.prod(recall), 1.0 / float(n_classes))
+                   )
 
 def spIndex(recall, n_classes):
     return np.sqrt(np.sum(recall) / n_classes *\
@@ -14,7 +22,24 @@ def effAcc(recall, n_classes):
     return np.sum(recall) / n_classes
 
 
+def estimator_sp_index(estimator, trgt, X, n_classes):
+    return spIndex(estimator_recall_score(estimator, trgt, X), n_classes)
+
+
+def estimator_recall_score(estimator, trgt, X, average=None):
+    model_output = estimator.predict(X)
+    trgt = estimator.transform(X, trgt)
+    recall = recall_score(trgt, model_output)
+    return recall
+
+
 def recall_score(trgt, model_output, average=None):
+    print 'begin'
+    print trgt.shape
+    print model_output.shape
+    # if trgt.ndim > 1 and model_output.ndim > 1:
+    #     trgt = trgt.argmax(axis=1)
+    #     model_output = model_output.argmax(axis=1)
     recall = sklearn.metrics.recall_score(trgt, model_output, average=average)
     return recall
 

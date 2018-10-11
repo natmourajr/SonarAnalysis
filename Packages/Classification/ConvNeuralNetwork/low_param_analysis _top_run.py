@@ -1,21 +1,20 @@
 import sys
+
 sys.path.extend(['/home/pedrolisboa/Workspace/lps/LpsToolbox'])
 
 from lps_toolbox.pipeline import ExtendedPipeline
 from lps_toolbox.model_selection._search import PersGridSearchCV
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from Functions.ConvolutionalNeuralNetworks import MLPClassifier, ConvNetClassifier
-from sklearn.model_selection import StratifiedKFold
+from Functions.ConvolutionalNeuralNetworks import ConvNetClassifier
 
-from sklearn.datasets import load_iris
 from keras.utils import to_categorical
 from Functions.NpUtils.DataTransformation import Lofar2Image, SonarRunsInfo
 from sklearn.externals import joblib
 import os
+import keras.regularizers
 # Database caracteristics
-from Functions.SystemIO import load, save
+from Functions.SystemIO import load
 import pandas as pd
 
 datapath = os.getenv('OUTPUTDATAPATH')
@@ -80,7 +79,6 @@ pipe = ExtendedPipeline(steps=[('lofar2image', lofar2image),
                                ('clf', cnn_clf)])#,
                         #memory=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
-import keras.regularizers
 gs = PersGridSearchCV(estimator=pipe,
                       param_grid={"clf__kernel_regularizer": [None, keras.regularizers.l2()],
                                   "clf__dense_dropout": [None, (0.8,), (0.6,), (0.5,), (0.3,)],
@@ -89,6 +87,11 @@ gs = PersGridSearchCV(estimator=pipe,
                                   "clf__dense_layer_sizes": [(10,4), (20, 4), (30, 4)]},
                       cv=cv,
                       verbose=1,
+                      # scores={'spIndex': spIndex,
+                      #         'eff_0': lambda x, y: recall_score(y, x)[0],
+                      #         'eff_1': lambda x, y: recall_score(y, x)[1],
+                      #         'eff_2': lambda x, y: recall_score(y, x)[2],
+                      #         'eff_3': lambda x, y: recall_score(y, x)[3]},
                       cachedir=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
 # print list(cv.split(X,y))
