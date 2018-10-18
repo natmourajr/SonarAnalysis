@@ -57,7 +57,8 @@ cv = load('/home/pedrolisboa/Workspace/lps/SonarAnalysis/Results/10_folds_cv_run
 
 
 scaler = StandardScaler()
-lofar2image = Lofar2Image(all_data,all_trgt, 10, 10, run_indices_info, filepath=None, channel_axis='last')
+lofar2image = Lofar2Image(all_data,all_trgt, 10, 10, run_indices_info, filepath=None, channel_axis='last',
+                          memory=os.path.join(results_path, 'Low_Param_Analysis'))
 
 
 cnn_clf = ConvNetClassifier(LofarObj=lofar2image,
@@ -104,6 +105,7 @@ gs.fit(all_data, all_trgt, clf__validation_split=0.1, clf__class_weight=True, cl
 pd.DataFrame(gs.cv_results_).to_csv(os.path.join(results_path, 'Low_Param_Analysis/gs_results.csv'))
 gs.best_estimator_._final_estimator.plotTraining(train_scores=['loss'],
                                                  val_scores=['val_loss'])
+print gs.cv_estimators
 
 # import pandas as pd
 # from pprint import pprint

@@ -151,13 +151,14 @@ def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True)
         plt.rcParams['xtick.labelsize'] = 30
         plt.rcParams['ytick.labelsize'] = 30
 
-        plt.imshow(image,
+        x= plt.imshow(image,
                    cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
                    aspect="auto")
 
         plt.xlabel('Frequency bins', fontweight='bold')
         plt.ylabel('Time (seconds)', fontweight='bold')
-
+        if colorbar:
+            plt.colorbar(x)
         if not filename is None:
             plt.savefig(filename, bbox_inches='tight')
             plt.close()

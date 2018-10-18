@@ -79,6 +79,10 @@ pipe = ExtendedPipeline(steps=[('lofar2image', lofar2image),
                                ('clf', cnn_clf)])#,
                         #memory=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
 
+import ipyparallel as ipp
+
+c = ipp.Client(profile='ssh', sshserver='pedro.lisboa@ferney')
+
 gs = PersGridSearchCV(estimator=pipe,
                       param_grid={"clf__kernel_regularizer": [None, keras.regularizers.l2()],
                                   "clf__dense_dropout": [None, (0.8,), (0.6,), (0.5,), (0.3,)],
@@ -92,7 +96,8 @@ gs = PersGridSearchCV(estimator=pipe,
                       #         'eff_1': lambda x, y: recall_score(y, x)[1],
                       #         'eff_2': lambda x, y: recall_score(y, x)[2],
                       #         'eff_3': lambda x, y: recall_score(y, x)[3]},
-                      cachedir=os.path.join(results_path, 'Low_Param_Analysis_Topology'))
+                      cachedir=os.path.join(results_path, 'Low_Param_Analysis_Topology'),
+                      client=c)
 
 # print list(cv.split(X,y))
 # print list(cv.split(X,y))
