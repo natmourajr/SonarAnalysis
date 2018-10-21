@@ -52,6 +52,13 @@ while(user_loop)
         data_info.n_pts_fft = 1024;
     end
 
+    data_info.num_overlap = 0;
+    data_info.num_overlap = input(sprintf('Overlap [default: 0]: '));
+
+    if isempty(data_info.overlap)
+        data_info.decimation_rate = 0;
+    end
+
     data_info.decimation_rate = 0;
     data_info.decimation_rate = input(sprintf('Decimation Ratio [default: 3]: '));
 
@@ -114,11 +121,11 @@ for iclass = 1:length(dir_info)
             raw_data{irun} = raw_data{irun}(:,1);
         end
         [power, freq, time] = lofar(raw_data{irun}', data_info.fs{aux_class}(irun), ...
-            data_info.n_pts_fft, data_info.decimation_rate, data_info.spectrum_bins_left);
+            data_info.n_pts_fft, data_info.num_overlap, data_info.decimation_rate, data_info.spectrum_bins_left);
         lofar_data{irun} = power;
     end
-    save(sprintf('%s/%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.mat', ...
-        outputpath,database,dir_info(iclass).name,data_info.n_pts_fft, ...
+    save(sprintf('%s/%s/%s/lofar_data_file_fft_%i_overlap_%i_decimation_%i_spectrum_left_%i.mat', ...
+        outputpath,database,dir_info(iclass).name,data_info.n_pts_fft, data_info.num_overlap, ...
         data_info.decimation_rate,data_info.spectrum_bins_left),'lofar_data');
     aux_class = aux_class+1;
 end

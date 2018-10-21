@@ -1,6 +1,6 @@
-function [Power, freq, time ] = lofar(data, fs, n_pts_fft, decimation_rate, spectrum_bins_left)
+function [Power, freq, time ] = lofar(data, fs, n_pts_fft, num_overlap, decimation_rate, spectrum_bins_left)
 %LOFAR Function that performs Lofar Analysis
-%   [Power, freq, time ] = lofar(data, n_pts_fft, decimation_rate, spectrum_bins_left, show_plot)
+%   [Power, freq, time ] = lofar(data, n_pts_fft, num_overlap, decimation_rate, spectrum_bins_left, show_plot)
 %   
 %   Output arguments: 
 %       Power:
@@ -16,12 +16,13 @@ function [Power, freq, time ] = lofar(data, fs, n_pts_fft, decimation_rate, spec
 %       show_plot:
 
 if nargin<2, help lofar; return; end
-if nargin<3, n_pts_fft = 1024; decimation_rate = 3; spectrum_bins_left=400; end
-if nargin<4, decimation_rate = 3; spectrum_bins_left=400; end
-if nargin<5, spectrum_bins_left=400; end
+if nargin<3, n_pts_fft = 1024; num_overlap = 0; decimation_rate = 3; spectrum_bins_left=400; end
+if nargin<4 num_overlap = 0; decimation_rate = 3; spectrum_bins_left=400; end
+if nargin<5, decimation_rate = 3; spectrum_bins_left=400; end
+if nargin<6, spectrum_bins_left=400; end
 
 % Default LOFAR Parameters
-num_overlap = 0;
+%num_overlap = 0;
 
 norm_parameters.lat_window_size = 10;
 norm_parameters.lat_gap_size = 1;
