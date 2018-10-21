@@ -55,7 +55,7 @@ while(user_loop)
     data_info.num_overlap = 0;
     data_info.num_overlap = input(sprintf('Overlap [default: 0]: '));
 
-    if isempty(data_info.overlap)
+    if isempty(data_info.num_overlap)
         data_info.decimation_rate = 0;
     end
 
