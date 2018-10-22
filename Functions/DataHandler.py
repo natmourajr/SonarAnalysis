@@ -7,7 +7,28 @@ import time
 
 import numpy as np
 import numpy.random as np_rnd
+from sklearn.externals import joblib
 
+
+class LofarDataset(object):
+    def __init__(self, data_path):
+        self.data_path = data_path
+
+    def loadData(self, database, n_pts_fft, overlap_fft, decimation_rate, spectrum_bins_left):
+        data_path = self.data_path
+        # Check if LofarData has been created
+        if not os.path.exists('%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl' %
+                              (data_path, database, n_pts_fft, decimation_rate, spectrum_bins_left)):
+            print 'No Files in %s/%s\n' % (data_path, database)
+            return
+        else:
+            # Read lofar data
+            [data, trgt, class_labels] = joblib.load('%s/%s/lofar_data_file_fft_%i_decimation_%i_spectrum_left_%i.jbl' %
+                                                     (data_path, database, n_pts_fft, decimation_rate,
+                                                      spectrum_bins_left))
+
+            dataset = (data, trgt, class_labels)
+        return dataset
 
 class DataHandlerFunctions(object):
     def __init__(self):
