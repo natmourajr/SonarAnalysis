@@ -24,6 +24,10 @@ from Functions.StackedAutoEncoders import StackedAutoEncoders
 
 from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
 
+from Functions.telegrambot import Bot
+
+my_bot = Bot("lisa_thebot")
+
 num_processes = multiprocessing.cpu_count()
 
 
@@ -61,6 +65,7 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
 
     def train(self, model_hash="", inovelty=0, fineTuning=False, trainingType="normal", ifold=0, hidden_neurons=[1],
               neurons_variation_step=50, layer=1, numThreads=num_processes):
+        startTime = time.time()
         if fineTuning == False:
             fineTuning = 0
         else:
@@ -75,6 +80,17 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             layer, inovelty, fineTuning, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
         print sysCall
         os.system(sysCall)
+        duration = str(timedelta(seconds=float(time.time() - startTime)))
+        
+        message = "Technique: {}\n".format(self.parameters['Technique'])
+        message = message + "Training Type: {}\n".format(trainingType)
+        message = message + "Novelty Class: {}\n".format(analysis.class_labels[inovelty])
+        message = message + "Hash: {}\n".format(analysis.model_hash)
+        message = message + "Duration: {}\n".format(duration)
+        try:
+            my_bot.sendMessage(message)
+        except Exception as e:
+            print("Erro ao enviar mensagem. Erro: " + str(e))
 
     def get_data_scaler(self, inovelty=0, ifold=0):
         train_id, test_id = self.CVO[inovelty][ifold]

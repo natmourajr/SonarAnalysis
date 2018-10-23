@@ -15,12 +15,12 @@ parser.add_argument("-T", "--type", default="normal", type=str, help="Select the
 parser.add_argument("-v", "--verbose", default=False, type=bool, help="Verbose")
 
 args = parser.parse_args()
-num_processes = args.threads
+num_processes = int(args.threads)
 inovelty = args.novelty
 fineTuning = args.finetunning
 trainingType = args.type
-step = args.neuronsVariationStep
-layer = args.layer
+step = int(args.neuronsVariationStep)
+layer = int(args.layer)
 
 from SAENoveltyDetectionAnalysis import SAENoveltyDetectionAnalysis
 

@@ -370,7 +370,7 @@ class StackedAutoEncoders:
                 verbose=self.verbose,
                 mode='auto')
             init_trn_desc = model.fit(norm_data[train_id], norm_data[train_id],
-                                      epochs=self.parameters["HyperParameters"]["n_epochs"],
+                                      epochs=int(self.parameters["HyperParameters"]["pretraining_n_epochs"]), # PRE-TRAINING
                                       batch_size=self.parameters["HyperParameters"]["batch_size"],
                                       callbacks=[earlyStopping],
                                       verbose=self.verbose,
@@ -530,7 +530,7 @@ class StackedAutoEncoders:
                                                     mode='auto')
             class_weights = getGradientWeights(trgt[train_id])
             init_trn_desc = model.fit(norm_data[train_id], trgt_sparse[train_id],
-                                      epochs=self.parameters["HyperParameters"]["n_epochs"],
+                                      epochs=int(self.parameters["HyperParameters"]["finetuning_n_epochs"]), #FINE-TUNING
                                       batch_size=self.parameters["HyperParameters"]["batch_size"],
                                       callbacks=[earlyStopping],
                                       verbose=self.verbose,

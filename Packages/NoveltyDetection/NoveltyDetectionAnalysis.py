@@ -22,7 +22,7 @@ import numpy as np
 from sklearn.externals import joblib
 from sklearn import metrics
 from sklearn import model_selection
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from keras.utils import np_utils
 from Functions import TrainParameters
 from Functions import DataHandler as dh
@@ -259,15 +259,15 @@ class NoveltyDetectionAnalysis(object):
                 print("Reading from " + self.parameters_file)
                 self.parameters = json.load(file)
     
-    def plot_train_history_loss(self, history):
-        # summarize history for loss
-        plt.plot(history.history['loss'])
-        plt.plot(history.history['val_loss'])
-        plt.title('model loss')
-        plt.ylabel('loss')
-        plt.xlabel('epoch')
-        plt.legend(['train', 'test'], loc='upper right')
-        plt.show()
+    #def plot_train_history_loss(self, history):
+    #    # summarize history for loss
+    #    plt.plot(history.history['loss'])
+    #    plt.plot(history.history['val_loss'])
+    #    plt.title('model loss')
+    #    plt.ylabel('loss')
+    #    plt.xlabel('epoch')
+    #    plt.legend(['train', 'test'], loc='upper right')
+    #    plt.show()
 
     def relative_auc(self, x, y, xlim = [0,1], ylim=[0,1]):
         total_area = (xlim[1] - xlim[0])*(ylim[1]-ylim[0])
