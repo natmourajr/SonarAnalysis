@@ -6,6 +6,8 @@
 """
 import os
 import sys
+import time
+from datetime import datetime, timedelta
 
 sys.path.insert(0, '..')
 
@@ -23,6 +25,10 @@ from Functions.email_utils import EmailConnection, Email
 from Functions.NeuralNetworks import NeuralNetworks
 
 from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
+
+from Functions.telegrambot import Bot
+
+my_bot = Bot("lisa_thebot")
 
 num_processes = multiprocessing.cpu_count()
 
@@ -54,7 +60,8 @@ class NNNoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             
     def train(self, model_hash="", inovelty=0, trainingType="normal", ifold=0, hidden_neurons=[1],
               neurons_variation_step=50, layer=1, numThreads=num_processes):
-        
+        startTime = time.time()
+
         hiddenNeuronsStr = str(hidden_neurons[0])
         if len(hidden_neurons) > 1:
             for ineuron in hidden_neurons[1:]:
@@ -64,3 +71,14 @@ class NNNoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
             layer, inovelty, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
         print sysCall
         os.system(sysCall)
+        
+        duration = str(timedelta(seconds=float(time.time() - startTime)))
+        message = "Technique: {}\n".format(self.parameters["Technique"])
+        message = message + "Training Type: Neuron Sweep\n"
+        message = message + "Novelty Class: {}\n".format(self.class_labels[inovelty])
+        message = message + "Hash: {}\n".format(self.model_hash)
+        message = message + "Duration: {}\n".format(duration)
+        try:
+            my_bot.sendMessage(message)
+        except Exception as e:
+            print("Erro ao enviar mensagem. Erro: " + str(e))
