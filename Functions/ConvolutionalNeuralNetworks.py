@@ -1082,7 +1082,7 @@ class ConvNetClassifier(BaseNNClassifier):
 
 class MLPClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self,
-                 hidden_layer_sizes=(10,),
+                 layer_sizes=(10,),
                  activations=("relu",),
                  solver="adam",
                  batch_size=32,
@@ -1171,8 +1171,8 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
                                    self.activity_regularizer,
                                    self.kernel_constraint,
                                    self.bias_constraint)
-                  for units, activation in zip(self.hidden_layer_sizes, self.activations)]
-        layers[0] = self.build_layer(self.hidden_layer_sizes[0],
+                  for units, activation in zip(self.layer_sizes, self.activations)]
+        layers[0] = self.build_layer(self.layer_sizes[0],
                                      self.activations[0],
                                      self.kernel_initializer,
                                      self.bias_initializer,
@@ -1218,7 +1218,7 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
         if self.log_history:
             csvlog = {"type": "CSVLogger", "filename": os.path.join(filepath, 'history.csv')}
             callbacks.append(csvlog)
-
+        print callbacks
         callbacks_list = TrainParameters.Callbacks()
         callbacks_list.add(callbacks)
         return trnParams, callbacks_list, filepath
@@ -1286,9 +1286,7 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
             warnings.warn("Number of initializations must be at least one."
                           "Falling back to one")
             n_inits = 1
-
-        print self.input_shape
-
+        print class_weights
         trnParams, callbacks, filepath = self._buildParameters()
         keras_callbacks = callbacks.toKerasFn()
         model = SequentialModelWrapper(trnParams,
@@ -1330,6 +1328,9 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
                 # print before == model.model.optimizer.weights
                 # print model.model.optimizer.weights
 
+        model = SequentialModelWrapper(trnParams,
+                                       results_path=filepath)
+        model.build_model()
         model.load_weights(best_weigths_path)
         self.history = pd.read_csv(os.path.join(filepath, 'history.csv'))
         self.model = model
@@ -1521,8 +1522,8 @@ class SequentialModelWrapper():
     def build_model(self):
         """Compile Keras model using the parameters loaded into the instance"""
         self.model = Sequential()
-        print self.layers[0].identifier
-        print self.layers[0].parameters
+        # print self.layers[0].identifier
+        # print self.layers[0].parameters
         for layer in self.layers:
             # print layer.identifier
             # print layer.parameters

@@ -303,7 +303,9 @@ class TrnParamsConvolutional(object):
         if isinstance(optimizer, Optimizer) or optimizer is None:
             self.__dict__['optimizer'] = optimizer
         elif isinstance(optimizer, list):
-            self.__dict__['optimizer'] = Optimizer(optimizer[0], optimizer[1])
+            new_optimizer = optimizer[1]
+            new_optimizer["type"] = optimizer[0]
+            self.__dict__['optimizer'] = Optimizer(new_optimizer)
         else:
             raise ValueError('optimizer must be an instance of Optimizer or list'
                              '%s of type %s was passed' % (optimizer, type(optimizer)))
@@ -498,7 +500,7 @@ class CNNParams(object):
         return hash + '_%i' % self.input_shape[0]
 
     def toNpArray(self):
-        print type(self.callbacks)
+        #print type(self.callbacks)
         if self.callbacks is not None:
             cbks = self.callbacks.toNpArray() # Compatibility purposes
         else:
@@ -723,7 +725,9 @@ class Layers(_ParameterSet):
             if isinstance(layers, list):
                 for layer in layers:
                     if isinstance(layer, list):
-                        layer = Layer(layer[0], layer[1])
+                        new_layer = layer[1]
+                        new_layer["type"] = layer[0]
+                        layer = Layer(new_layer)
                     elif layer == None:
                         layer = Layer()
                     self.add(layer)

@@ -34,9 +34,6 @@ def estimator_recall_score(estimator, trgt, X, average=None):
 
 
 def recall_score(trgt, model_output, average=None):
-    print 'begin'
-    print trgt.shape
-    print model_output.shape
     # if trgt.ndim > 1 and model_output.ndim > 1:
     #     trgt = trgt.argmax(axis=1)
     #     model_output = model_output.argmax(axis=1)

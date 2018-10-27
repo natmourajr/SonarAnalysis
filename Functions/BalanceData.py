@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.cluster import KMeans
-import numpy.random as np_rnd
 
 class DataCreator(object):
     def __init__(self):

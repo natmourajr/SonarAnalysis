@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from sklearn import cross_validation
+from sklearn import model_selection
 from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix
@@ -100,7 +100,7 @@ class TrnInformation(object):
 
     def SplitTrainSet(self, trgt):
         # divide data in train and test for novelty detection
-        CVO = cross_validation.StratifiedKFold(trgt, self.n_folds)
+        CVO = model_selection.StratifiedKFold(trgt, self.n_folds)
         self.CVO = list(CVO)
 
     def save(self, path=''):
@@ -899,7 +899,7 @@ class ModelDataCollection:
             index = pd.MultiIndex.from_tuples(model_scores.keys(), names=['CV', 'Fold'])
             model_scores = pd.DataFrame(model_scores.values(), index=index)
             return model_scores
-
+        print self.trained_cvs
         model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs.items()], axis=0)
         return model_scores
 

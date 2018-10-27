@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn
 import sklearn
 
-from sklearn import cross_validation
+from sklearn import model_selection
 from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix, auc
@@ -82,7 +82,7 @@ class TrnInformation(object):
 
     def SplitTrainSet(self,trgt):
         # divide data in train and test for novelty detection
-        CVO = cross_validation.StratifiedKFold(trgt[trgt!=self.novelty_class], self.n_folds)
+        CVO = model_selection.StratifiedKFold(trgt[trgt!=self.novelty_class], self.n_folds)
         self.CVO = list(CVO)
 
     def save(self, path=''):
@@ -613,6 +613,8 @@ class CnnNoveltyAnalysis(object):
 
     def _getScores(self, v_res, overwrite=False, zoom = (.90, .99), zoom_res_ratio=10):
         if exists(self.an_path + '/' + 'scores.csv') and not overwrite:
+            print "scores found"
+
             self.scores = pd.read_csv(self.an_path + '/' + 'scores.csv',
                                       index_col=[0, 1, 2, 3, 4])
             return
@@ -638,6 +640,7 @@ class CnnNoveltyAnalysis(object):
                                 index=pd.Index(['trigger', 'sp', 'nv'], name='Score'))
 
         predictions = self.nv_predictions.reset_index(level='Fold')
+
         score_pd = predictions.groupby(by=['Model', 'CV', 'Novelty', 'Fold']).apply(_calcScores)
         score_pd.to_csv(self.an_path + '/' + 'scores.csv', float_format='%.5f')
 
@@ -941,6 +944,7 @@ class CnnNoveltyAnalysis(object):
                                cv_thres_zoom.groupby(by='Novelty')):
 
                     known_cls = [value for value in self.class_labels.keys() if value != novelty_cls]
+                    print novelty_cls
 
                     nv_rate_matrix = np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
                                               .apply(lambda x: recall_score_novelty(group['Label'].values,
@@ -1030,7 +1034,7 @@ class CnnNoveltyAnalysis(object):
 
                     #known_cls = [value for value in self.class_labels.keys() if value != novelty_cls]
                     known_cls = range(len(self.class_labels) - 1)
-
+                    print folds_thresh_pd['Label']
                     recall_tensor = [np.array([group.drop(columns=['Novelty', 'CV', 'Model', 'Label'])
                                               .apply(lambda x: recall_score_novelty(group['Label']
                                                                             .values, x.values, novelty_cls, self.class_labels)[cls], axis=0)
@@ -1351,6 +1355,68 @@ class CnnNoveltyAnalysis(object):
                     plt.savefig(savepath + 'nv_t_trigger_%i.pdf' % novelty_cls,
                                 bbox_inches='tight')
                     plt.close(fig)
+
+    def newPlotSPThres(self):
+        scores = self.scores.xs('sp', axis=0,level='Score', drop_level=True)
+        for novelty, nv_scores in scores.groupby(level='Novelty'):
+            mean = nv_scores.groupby(level='Fold').mean()
+            std = nv_scores.groupby(level='Fold').std()
+
+            #thres = map(str, mean.columns.names)
+
+            print mean.columns.values
+
+            fig = plt.figure(figsize=(6, 6))
+            nv_ax = plt.gca()
+            sp_ax = nv_ax.twinx()
+
+            sp_ax.plot(threshold_values, cv_trigger['mean'].values, color='black')
+            sp_ax.fill_between(threshold_values, cv_trigger['mean'] + cv_trigger['std'],
+                               cv_trigger['mean'] - cv_trigger['std'], color='black',
+                               alpha=0.3, label='SP index')
+
+            nv_ax.plot(threshold_values, cv_nv_rate['mean'].values, color='crimson', linestyle=':')
+            nv_ax.fill_between(threshold_values, cv_nv_rate['mean'] + cv_nv_rate['std'],
+                               cv_nv_rate['mean'] - cv_nv_rate['std'],
+                               alpha=0.3, color='crimson', label='Novelty rate')
+            nv_ax.set_ylabel('Novelty rate', fontsize=15)
+            sp_ax.set_ylabel('SP index', fontsize=15)
+            nv_ax.set_xlabel('Threshold', fontsize=15)
+
+            for ax in [nv_ax, sp_ax]:
+                ax.set_ylim(0, 1.12)
+
+            plt.title('Novelty detection for %s' % self.class_labels[novelty_cls], fontsize=18)
+            lines, labels = nv_ax.get_legend_handles_labels()
+            lines2, labels2 = sp_ax.get_legend_handles_labels()
+            nv_ax.legend(lines + lines2, labels + labels2, loc='upper left', ncol=2)
+
+            ax2 = plt.axes([0.22, 0.33, 0.50, 0.35])
+
+            ax2.plot(threshold_values_zoom, cv_trigger_zoom['mean'].values, color='black')
+            ax2.fill_between(threshold_values_zoom,
+                             cv_trigger_zoom['mean'] + cv_trigger_zoom['std'],
+                             cv_trigger_zoom['mean'] - cv_trigger_zoom['std'],
+                             color='black',
+                             alpha=0.3)
+
+            ax2.plot(threshold_values_zoom, cv_nv_rate_zoom['mean'].values, color='crimson', linestyle=':')
+            ax2.fill_between(threshold_values_zoom, cv_nv_rate_zoom['mean'] + cv_nv_rate_zoom['std'],
+                             cv_nv_rate_zoom['mean'] - cv_nv_rate_zoom['std'],
+                             color='crimson', alpha=0.3)
+            ax2.set_xlim(0.95, 1)
+            ax2.set_ylim(.2, 1)
+
+            savepath = self.an_path + '/%s/%s/' % (model_name, cv_name)
+            if not exists(savepath):
+                mkdir(savepath)
+            plt.savefig(savepath + 'nv_t_sp_%i.pdf' % novelty_cls,
+                        bbox_inches='tight')
+            plt.savefig(savepath + 'nv_t_sp_%i.png' % novelty_cls,
+                        bbox_inches='tight')
+            plt.close(fig)
+
+
 
     def plotSPThresholds(self, v_res):
         colors = {0: 'b', 1: 'g', 2: 'y', 3: 'r'}
