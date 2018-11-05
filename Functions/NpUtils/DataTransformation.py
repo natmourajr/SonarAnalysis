@@ -22,7 +22,7 @@ def trgt2categorical(trgt, n_classes):
 
 
 class SonarRunsInfo():
-    def __init__(self, inputdatapath, verbose = False):
+    def __init__(self, inputdatapath, window, verbose=False):
         self.inputdatapath = inputdatapath
         self.runs = OrderedDict()
         self.runs_named = OrderedDict()
@@ -39,7 +39,7 @@ class SonarRunsInfo():
             run_paths = map(lambda x: self.inputdatapath + '/' + class_folder + '/' + x, run_files)
             run_names.sort()
             run_paths.sort()
-            run_indices = list(self._iterClassIndices(run_paths, class_offset, 1024))
+            run_indices = list(self._iterClassIndices(run_paths, class_offset, window))
             if self.verbose:
                 offsets = list(map(lambda x: x[0], run_indices))
                 lengths = list(map(len, run_indices))

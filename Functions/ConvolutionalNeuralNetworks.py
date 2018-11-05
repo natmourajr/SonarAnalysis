@@ -1520,6 +1520,7 @@ class SequentialModelWrapper():
         self.__init__(*args)
 
     def build_model(self):
+
         """Compile Keras model using the parameters loaded into the instance"""
         self.model = Sequential()
         # print self.layers[0].identifier

@@ -73,10 +73,10 @@ class NestedCV:
 
 
 class SonarRunsCV(BaseCrossValidator):
-    def __init__(self, n_splits, inputdatapath, verbose = False):
+    def __init__(self, n_splits, inputdatapath, window, verbose=False):
         super(SonarRunsCV, self).__init__()
 
-        runs_info = SonarRunsInfo(inputdatapath, verbose)
+        runs_info = SonarRunsInfo(inputdatapath, window, verbose)
         self.inputdatapath = inputdatapath
         self.n_splits = n_splits
         self.class_folders = runs_info.class_folders
