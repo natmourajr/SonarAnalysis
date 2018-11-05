@@ -15,10 +15,16 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-#sys.path.extend(['/home/pedrolisboa/Workspace/lps/LpsToolbox'])
-from itertools import starmap
+
+from Functions.CrossValidation import SonarRunsCV
+
+sys.path.extend(['/home/pedrolisboa/Workspace/lps/LpsToolbox'])
+from itertools import starmap, product
 from Functions.DataHandler import LofarDataset
-from Functions.ConvolutionalNeuralNetworks import MLPClassifier
+from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
+from lps_toolbox.neural_network.classifiers import ConvNetClassifier
+from lps_toolbox.metrics.classification import sp_index
+#from Functions.ConvolutionalNeuralNetworks import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.preprocessing import StandardScaler
 from keras.utils import to_categorical
@@ -43,21 +49,23 @@ def factor2(num):
 
 #window_list = map(lambda e: pow(2,e), range(7,13,1))
 #overlap_list = map(factor2, window_list)
-window_list = [1024]
+window_list = [1024, 512, 256, 128]
 overlap_list = [0]
 decimation_rate = 3
-spectrum_bins_left = 400
+spectrum_bins_left_list = [400, 205, 103, 52]
 
 
 # In[3]:
 
 
-def lofar_iter(estimator, fold_fun, dataset_obj, train_fun, verbose):
+def lofar_iter(estimator, train_fun, verbose):
     results = {'window': [],
                'overlap': [],
                'fold': [],
                'scores': []}
-    for window, overlap in zip(window_list, overlap_list):
+    for (window, spectrum_bins_left), overlap in product(zip(window_list, spectrum_bins_left_list), overlap_list):
+        print window
+        skf = SonarRunsCV(10, os.path.join(audiodatapath, database), window)
         if verbose:
             print('Window: %i  Overlap: %i' % (window, overlap))
         X, y, class_labels = lofar.loadData(database, window, overlap, decimation_rate, spectrum_bins_left)
@@ -76,15 +84,17 @@ def lofar_iter(estimator, fold_fun, dataset_obj, train_fun, verbose):
                 print('\tCreating cross validation configuration')
             cvo = list(skf.split(X, y))
             joblib.dump(cvo, cvo_file)
-        cachedir = cvo_file[:-4]
-        partial_results = train_fun(X,y, cvo, estimator, verbose, cachedir)
+        cachedir = os.path.join('FullClassification', cvo_file[:-4])
+
+        s_info = SonarRunsInfo(os.path.join(audiodatapath, database), window)
+        partial_results = train_fun(X,y, cvo, estimator, verbose, s_info, cachedir)
         
         results['window'] = list(repeat(window, len(partial_results['scores'])))
         results['overlap'] = list(repeat(overlap, len(partial_results['scores'])))
         for key in partial_results:
             results[key].extend(partial_results[key])
             
-        return results
+    return results
         
         
 
@@ -101,30 +111,38 @@ import dill
 # c = ipp.Client()
 # c[:].use_dill()
 # dview = c[:]
-def novelty_detectionCV(X, y, cvo, estimator, verbose, cachedir):
+def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
     scores = list()
     fold = list()
     def train_fold(data):
         i_fold, train, test = data
+        window_qtd=10
+        window_qtd_stride=5
+        print np.unique(y)
+        X_train, y_train = lofar2image(X, y, train, window_qtd, window_qtd_stride, s_info)
+        X_test, y_test = lofar2image(X, y, test, window_qtd, window_qtd, s_info)
+        print np.unique(y_train)
+        print np.unique(y_test)
         if verbose:
             print('\t\t Fold %i' % i_fold)
-        X_train = X[train]
-        y_train = y[train]
-
-        X_test = X[test]
-        y_test = y[test]
-        scaler.fit(X_train, y_train)
-        X_train = scaler.transform(X_train)
-        X_test = scaler.transform(X_test)
-
+        # X_train = X[train]
+        # y_train = y[train]
+        #
+        # X_test = X[test]
+        # y_test = y[test]
+        # scaler.fit(X_train, y_train)
+        # X_train = scaler.transform(X_train)
+        # X_test = scaler.transform(X_test)
         y_train = to_categorical(y_train)
         y_test = to_categorical(y_test)
 
-        estimator.cachedir = os.path.join(cachedir, '%i_fold' % i_fold)
+        inner_cachedir = os.path.join(cachedir, '%i_fold' % i_fold)
         estimator.fit(X_train, y_train,
                       validation_split=0.1,
-                      n_inits=10,
-                      verbose=verbose)
+#                      validation_data=(X_test, y_test),
+                      n_inits=2,
+                      verbose=verbose,
+                      cachedir=inner_cachedir)
         score = estimator.score(X_test, y_test)
         return (i_fold, score)
 #         scores.append(score)
@@ -142,44 +160,28 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, cachedir):
 
 
 import time
-verbose = 3
+verbose = 1
 lofar = LofarDataset(datapath)
-skf = StratifiedKFold(n_splits=10)
-estimator = MLPClassifier(layer_sizes=(10,4),
-                          activations=('tanh', 'softmax'),
-                          input_shape=(400,),
-                          epochs=100)
+#skf = StratifiedKFold(n_splits=10)
+estimator = ConvNetClassifier(conv_filter_sizes=((2, 10),),
+                              conv_strides=((2, 5),),
+                              conv_activations=("tanh",),
+                              pool_filter_sizes=((2, 5),),
+                              dense_layer_sizes=(10, 4),
+                              dense_activations=("tanh", "softmax"),
+                              epochs=100,
+                              metrics=['acc']#, sp_index]
+                              )
+# estimator = mlpclassifier(layer_sizes=(10,4),
+#                           activations=('tanh', 'softmax'),
+#                           input_shape=(400,),
+#                           epochs=100)
 start = time.time()
-results = lofar_iter(estimator, skf, lofar, novelty_detectionCV, verbose)
+results = lofar_iter(estimator, novelty_detectionCV, verbose)
 stop = time.time()
 
 print stop - start
 
-
-# In[ ]:
-
-
 import pandas as pd
-pd.DataFrame(results)
-# results['window'] = list(results['window'])
-# results['overlap'] = list(results['overlap'])
-
-
-# In[12]:
-
-
-import ipyparallel as ipp
-c = ipp.Client()
-
-
-# In[13]:
-
-
-c.ids
-
-
-# In[ ]:
-
-
-c[:].map_sync()
+pd.DataFrame(results).to_csv('./results.csv')
 
