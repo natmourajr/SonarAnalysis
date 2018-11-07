@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from sklearn import cross_validation
+from sklearn import model_selection
 from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix
@@ -26,7 +26,7 @@ from keras import backend as backend
 
 import matplotlib.pyplot as plt
 
-from Functions.ConvolutionalNeuralNetworks import KerasModel
+from Functions.ConvolutionalNeuralNetworks import OldKerasModel
 from Functions.FunctionsDataVisualization import plotConfusionMatrix, plotLOFARgram
 from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
 from Functions.NpUtils.Scores import recall_score, spIndex
@@ -100,7 +100,7 @@ class TrnInformation(object):
 
     def SplitTrainSet(self, trgt):
         # divide data in train and test for novelty detection
-        CVO = cross_validation.StratifiedKFold(trgt, self.n_folds)
+        CVO = model_selection.StratifiedKFold(trgt, self.n_folds)
         self.CVO = list(CVO)
 
     def save(self, path=''):
@@ -602,22 +602,19 @@ class NeuralClassification(ClassificationBaseClass):
         # return K.mean(K.equal(trgt, K.lesser(output, threshold)))
 
 
-class CnnAnalysisFunction:
-    def __init__(self, ncv_obj, trnParamsMapping, package_name, analysis_name, class_labels):
-        self.modelsData = {model_name: ModelDataCollection(ncv_obj, trnParams, package_name,
+class CnnClassificationAnalysis:
+    def __init__(self, ncv_obj, trn_params_mapping, package_name, modelpaths, analysis_name, class_labels):
+        self.modelsData = {model_name: ModelDataCollection(ncv_obj, trnParams, package_name, modelpaths,
                                                            analysis_name + '/%s' % model_name,
                                                            class_labels)
-                              for model_name, trnParams in trnParamsMapping.items()}
-        for model_name,cnn_an in self.modelsData.items():
-            print model_name
-            print cnn_an.params.input_shape
+                              for model_name, trnParams in trn_params_mapping.items()}
 
         for modelData in self.modelsData.values():
             modelData.fetchPredictions()
-            modelData.fecthHistory()
+            # modelData.fecthHistory()
 
         self.an_path = package_name + '/' + analysis_name
-        self.resultspath = package_name
+        self.resultspath = package_name + '/' + modelpaths
         self.class_labels = class_labels
         self.scores = None
         self.getScores()
@@ -630,11 +627,10 @@ class CnnAnalysisFunction:
             modelData.plotTraining()
             modelData.getScores()
             modelData.plotDensities()
-            modelData.plotRuns(data, trgt, ["Conv2D"], overwrite=False)
+            modelData.plotLayerOutputs(data, trgt, ["Conv2D"], overwrite=False)
 
     def getScores(self):
         scores = {model_name:cnn_an.getScores() for model_name, cnn_an in self.modelsData.items()}
-
         for model_name in scores.keys():
             scores[model_name]['Model'] = model_name
 
@@ -696,12 +692,6 @@ class CnnAnalysisFunction:
             fig.savefig(scorespath, bbox_inches='tight')
             plt.close(fig)
 
-    def fetchPredictions(self):
-        raise NotImplementedError
-
-    def fetchHistory(self):
-        raise NotImplementedError
-
     def plotConfusionMatrices(self):
         raise NotImplementedError
 
@@ -711,27 +701,41 @@ class CnnAnalysisFunction:
     def plotTraining(self):
         raise NotImplementedError
 
-    def plotDensitise(self):
-        raise NotImplementedError
+    def plotDensities(self):
+        for modelData in self.modelsData.values():
+            modelData.plotDensities()
 
     def plotRuns(self):
         raise NotImplementedError
 
+
 class ModelDataCollection:
-    def __init__(self, ncv_obj, trnParams, package_name, analysis_name, class_labels):
+    def __init__(self, ncv_obj, trnParams, package_name, modelpaths, analysis_name, class_labels):
         self.n_cv = ncv_obj
         self.params = trnParams
         # TODO add already trained folds check
-        self.an_path = package_name + '/' + analysis_name
-        self.resultspath = package_name
-        self.modelpath = package_name + '/' + trnParams.getParamPath()
+        self.an_path = package_name + '/' + analysis_name + '/' + modelpaths
+        #self.resultspath = package_name
+        self.modelpath = package_name + '/' + modelpaths + '/' + trnParams.getParamPath()
         self.trained_cvs = self.n_cv.cv.items()
         self.class_labels = class_labels
         self.history = dict()
         self.predictions = dict()
 
+        self.trained_cvs = self.getTrainedCVs()
+
         if not exists(self.an_path):
             mkdir(self.an_path)
+
+
+    def getTrainedCVs(self):
+        trained_cvs = dict()
+
+        for cv_name, cv in self.n_cv.cv.items():
+            fold_path = self.modelpath + '/%s/' % cv_name
+            if exists(fold_path):
+                trained_cvs[cv_name] = cv
+        return trained_cvs
 
     def fecthHistory(self, overwrite=False):
         collections_filepath = self.an_path + '/history_collection.jbl'
@@ -740,31 +744,39 @@ class ModelDataCollection:
                   "To overwrite existing configuration, set overwrite to True")
             self.history = load(collections_filepath)
             return
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             fold_path = self.modelpath + '/%s/history.csv' % cv_name
             self.history[cv_name] = pd.read_csv(fold_path,
-                                                index_col=[0, 1, 2])
+                                                index_col=[0, 1, 2],
+                                                encoding='utf7')
             save(self.history, collections_filepath)
 
     def fetchPredictions(self, overwrite=False):
         collections_filepath = self.an_path + '/predictions_collection.jbl'
         if exists(collections_filepath) and not overwrite:
-            print("Collection found on analysis folder.Loading existing predictions. "
+            print("Collection found on analysis folder. Loading existing predictions. "
                   "To overwrite existing configuration, set overwrite to True")
             self.predictions = load(collections_filepath)
             return
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             fold_path = self.modelpath + '/%s/predictions.csv' % cv_name
 
             self.predictions[cv_name] = pd.read_csv(fold_path,
-                                                    index_col=[0, 2])
-            self.predictions[cv_name] = self.predictions[cv_name].drop(columns='Unnamed: 1')
+                                                    index_col=[0, 1])
+            # cls_nv = self.resultspath[-6:]
+            # inverse_cls = {value: key for key,value in self.class_labels.items()}
+            # print self.predictions[cv_name]['Unnamed: 1'] == inverse_cls[cls_nv]
+            # for name, group in self.predictions[cv_name].groupby(level=[1]):
+            #     if inverse_cls[cls_nv] != name:
+            #         print name
+                    # group.to_csv(fold_path)
+            #self.predictions[cv_name] = self.predictions[cv_name].drop(columns='Unnamed: 1')
             self.predictions[cv_name].index.rename(['Fold', 'Sample'], level=[0,1], inplace=True)
         save(self.predictions, collections_filepath)
 
     def plotConfusionMatrices(self, figsize=(10, 12), overwrite=False):
         class_labels = self.class_labels
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             saving_path = self.an_path + '/%s/cm/' % cv_name
             cv_prediction = self.predictions[cv_name]
             if not exists(saving_path):
@@ -790,7 +802,6 @@ class ModelDataCollection:
             scores = ['spIndex', 'val_spIndex', 'loss', 'val_loss']
         else:
             scores.extend(['val_' + score for score in scores])
-            print scores
         if scores_labels is None:
             scores_labels = {'spIndex': 'Train SP Index',
                              'val_spIndex': 'Val SP Index',
@@ -800,7 +811,7 @@ class ModelDataCollection:
             for score in scores:
                 scores_labels['val_' + score] = 'Val ' + scores_labels[score]
 
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             losspath = self.an_path + '/%s/loss/' % cv_name
             sns.set_style("whitegrid")
 
@@ -888,13 +899,13 @@ class ModelDataCollection:
             index = pd.MultiIndex.from_tuples(model_scores.keys(), names=['CV', 'Fold'])
             model_scores = pd.DataFrame(model_scores.values(), index=index)
             return model_scores
-
-        model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs], axis=0)
+        print self.trained_cvs
+        model_scores = pd.concat([getFoldScores(cv_name, cv) for cv_name, cv in self.trained_cvs.items()], axis=0)
         return model_scores
 
-    def plotDensities(self, bins=50, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
+    def plotDensities(self, bins=30, xtick_rotation=45, hspace=0.35, wspace=0.25, overwrite=False):
         class_labels = self.class_labels
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             densitypath = self.an_path + '/%s/densities/' % cv_name
             sns.set_style("whitegrid")
 
@@ -908,13 +919,26 @@ class ModelDataCollection:
 
             plt.style.use('seaborn-whitegrid')
             predictions = self.predictions[cv_name]
+            nv_class = [class_labels[i_cls] for i_cls, output_column in enumerate(predictions.filter(regex=('Class*'))) if
+                        pd.isnull(predictions[output_column]).all()][0]
+            predictions.drop(columns=nv_class, inplace=True)
+
+            n_outputs = predictions.filter(regex=('Class*')).shape[1] # Number of output columns (all minus the Label column)
+            n_classes = np.unique(predictions['Label'].values).shape[0]
+
+            inverted_labels = {value: key for key, value in class_labels.items()}
             for fold_name, fold_prediction in predictions.groupby(level='Fold'):
                 fig = plt.figure(figsize=(15, 8))
-                grid = plt.GridSpec(4, 4, hspace=hspace,wspace=wspace)
+                grid = plt.GridSpec(n_classes, n_outputs, hspace=hspace,wspace=wspace)
                 colors = ['b', 'r', 'g', 'y']
-                axes = np.array([[fig.add_subplot(grid[i, j]) for i in range(0,4)] for j in range(0,4)])
+                if nv_class:
+                    colors[inverted_labels[nv_class]] = 'k'
+
+                axes = np.array([[fig.add_subplot(grid[i, j])
+                                 for j in range(0, n_outputs)]
+                                 for i in range(0, n_classes)])
                 for correct_label, cls_predictions in fold_prediction.groupby(by='Label'):
-                    for pred_i, pred_label in enumerate(cls_predictions.drop(columns=['Label'])):
+                    for pred_i, pred_label in enumerate(cls_predictions.filter(regex=('Class*'))):
                         i, j = int(correct_label), pred_i
                         network_output = cls_predictions[pred_label].values  # Output for the predicted class
                         weights = np.zeros_like(network_output) + 1. / network_output.shape[0]  # Normalize bins
@@ -929,19 +953,158 @@ class ModelDataCollection:
                         axes[i,j].tick_params(axis='both', which='both', labelsize=10)
                         for tick in axes[i,j].get_xticklabels():
                             tick.set_rotation(xtick_rotation)
-
-                    axes[i,0].set_title(class_labels[i], fontsize = 15)
-                    axes[0,i].set_ylabel(class_labels[i], fontsize = 15)
+                        axes[0,j].set_title(class_labels[inverted_labels[pred_label]], fontsize = 15)
+                        axes[i,0].set_ylabel(class_labels[i], fontsize = 15)
                 fig.savefig(densitypath + '/%s.pdf' % fold_name, bbox_inches='tight')
                 plt.close(fig)
 
-    def plotRuns(self, data, trgt, layers_id, overwrite=False):
+
+
+            fig = plt.figure(figsize=(15, 8))
+            grid = plt.GridSpec(n_classes, n_outputs, hspace=hspace, wspace=wspace)
+            colors = ['b', 'r', 'g', 'y']
+            if nv_class:
+                colors[inverted_labels[nv_class]] = 'k'
+
+            axes = np.array([[fig.add_subplot(grid[i, j])
+                              for j in range(0, n_outputs)]
+                              for i in range(0, n_classes)])
+            for correct_label, cls_predictions in predictions.groupby(by='Label'):
+                for pred_i, pred_label in enumerate(cls_predictions.filter(regex=('Class*'))):
+                    i, j = int(correct_label), pred_i
+                    network_output = cls_predictions[pred_label].values  # Output for the predicted class
+                    weights = np.zeros_like(network_output) + 1. / network_output.shape[0]  # Normalize bins
+                    axes[i, j].hist(cls_predictions[pred_label].values,
+                                    bins=bins,
+                                    color=colors[i],
+                                    weights=weights,
+                                    histtype='stepfilled',
+                                    alpha=.6)
+                    axes[i, j].set_yscale('log')
+                    axes[i, j].set_yticks(np.logspace(-3, 0, 4))
+                    axes[i, j].tick_params(axis='both', which='both', labelsize=10)
+                    for tick in axes[i, j].get_xticklabels():
+                        tick.set_rotation(xtick_rotation)
+
+                    axes[0, j].set_title(class_labels[inverted_labels[pred_label]], fontsize=15)
+                    axes[i, 0].set_ylabel(class_labels[i], fontsize=15)
+            fig.savefig(densitypath + '/total_densities.png', bbox_inches='tight')
+            plt.close(fig)
+
+    def plotRunsPredictions(self, data, trgt, overwrite=False):
+        k_model = OldKerasModel(self.params)
+        window_size = self.params.input_shape[0]
+        for cv_name, cv in self.trained_cvs.items():
+            k_model.selectFoldConfig(10, mode=cv_name)
+
+            outputpath = self.an_path + '/%s/outputs/pred_maps' % cv_name
+
+            for i_fold, (_, test_index) in enumerate(cv):
+                k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
+
+                x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
+
+                p_test = k_model.predict(x_test).argmax(axis=1)
+                for cls_i, cls_str in self.class_labels.items():
+                    run = x_test[y_test == cls_i]
+                    run_trgt = y_test[y_test == cls_i]
+                    run_p = p_test[y_test == cls_i]
+                    print i_fold
+                    print 'Eff %s' % cls_i
+                    print sum(run_p == run_trgt)/float(len(run_trgt))
+                    # TODO pass this to NestedCV and recover here as an attribute
+                    ship_name = [ship_name
+                                 for ship_name, ship_indices in self.n_cv.info.runs_named[cls_str].items()
+                                 if np.isin(test_index, ship_indices).any()]
+                    fig = plt.figure(figsize=(10,10))
+                    ax = plt.gca()
+                    print ship_name
+
+                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+
+                    mask = np.concatenate([np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
+                                           for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
+                    from matplotlib import colors
+                    cmap = colors.ListedColormap(['red', 'blue'])
+                    bounds = [0, 0.5, 1]
+                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                    x = ax.imshow(mask[:, :, 0], alpha=.35, cmap=cmap,#plt.get_cmap('coolwarm_r', 2),
+                              extent=[1, mask.shape[1], mask.shape[0], 1],
+                              aspect="auto", vmin=0, vmax=1)
+                    # plt.colorbar(x, ax=ax, ticks=[0,1], boundaries=bounds)
+
+                    filepath = outputpath + '/%s' % cls_str
+                    if not exists(filepath):
+                        mkdir(filepath)
+                    else:
+                        pass
+
+                    fig.savefig(filepath + '/%i_fold_%s' % (i_fold, ship_name))
+                    plt.cla()
+                    plt.close(fig)
+
+    def plotNoveltyRunsPredictions(self, data, trgt, op, novelty_cls, overwrite=False):
+        k_model = OldKerasModel(self.params)
+        window_size = self.params.input_shape[0]
+        for cv_name, cv in self.trained_cvs.items():
+            k_model.selectFoldConfig(10, mode=cv_name)
+
+            outputpath = self.an_path + '/%s/outputs/pred_maps' % cv_name
+
+            for i_fold, (_, test_index) in enumerate(cv):
+                k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
+
+                x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
+
+                preds = k_model.predict(x_test)
+                p_test = preds.argmax(axis=1)
+                p_test[preds.max(axis=1) < op] = novelty_cls
+
+                for cls_i, cls_str in self.class_labels.items():
+                    run = x_test[y_test == cls_i]
+                    run_trgt = y_test[y_test == cls_i]
+                    run_p = p_test[y_test == cls_i]
+                    print i_fold
+                    print 'Eff %s' % cls_i
+                    print sum(run_p == run_trgt)/float(len(run_trgt))
+                    # TODO pass this to NestedCV and recover here as an attribute
+                    ship_name = [ship_name
+                                 for ship_name, ship_indices in self.n_cv.info.runs_named[cls_str].items()
+                                 if np.isin(test_index, ship_indices).any()]
+                    fig = plt.figure(figsize=(10,10))
+                    ax = plt.gca()
+                    print ship_name
+
+                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+
+                    mask = np.concatenate([p * np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
+                                           for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
+                    from matplotlib import colors
+                    cmap = colors.ListedColormap(['red', 'blue'])
+                    bounds = [0, 0.5, 1]
+                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                    x = ax.imshow(mask[:, :, 0], alpha=.35, cmap=cmap,#plt.get_cmap('coolwarm_r', 2),
+                              extent=[1, mask.shape[1], mask.shape[0], 1],
+                              aspect="auto", vmin=0, vmax=1)
+                    # plt.colorbar(x, ax=ax, ticks=[0,1], boundaries=bounds)
+
+                    filepath = outputpath + '/%s' % cls_str
+                    if not exists(filepath):
+                        mkdir(filepath)
+                    else:
+                        pass
+
+                    fig.savefig(filepath + '/%i_fold_%s' % (i_fold, ship_name))
+                    plt.cla()
+                    plt.close(fig)
+
+    def plotLayerOutputs(self, data, trgt, layers_id, overwrite=False):
         def reconstructRun(input, n_layer):
             return k_model.get_layer_n_output(n_layer, input)
 
-        k_model = KerasModel(self.params)
+        k_model = OldKerasModel(self.params)
         window_size = self.params.input_shape[0]
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             k_model.selectFoldConfig(10, mode=cv_name)
             for n, layer in enumerate(self.params.layers):
                 if layer.identifier in layers_id:
@@ -951,7 +1114,6 @@ class ModelDataCollection:
                         k_model.load(k_model.model_best + '/%i_fold.h5' % i_fold)
 
                         x_test, y_test = lofar2image(data, trgt, test_index, window_size, window_size, self.n_cv.info)
-
                         for cls_i, cls_str in self.class_labels.items():
                             run = x_test[y_test == cls_i]
 
@@ -972,20 +1134,14 @@ class ModelDataCollection:
                                     #     print "Layer %s_%i output already plotted. For overwriting current plots, " \
                                     #           "set overwrite to True. Exiting." % (layer.identifier, n)
                                     #     break
-
-                                plotLOFARgram(channel, filename=outpath + '/%s.pdf' % ship_name)
-
-
-
-
-
-
+                                plotLOFARgram(channel, filename=outpath + '/%i_fold_%s.png' % (i_fold, ship_name))
 
     def _reconstructPredictions(self, data, trgt, image_window):
         """Retro-compatibility function. Used to update prediction files old storage format to the new one"""
         class_labels = self.class_labels
+        import keras.backend as K
         run_info = SonarRunsInfo(self.n_cv.audiodatapath)
-        for cv_name, cv in self.n_cv.cv.items():
+        for cv_name, cv in self.trained_cvs.items():
             gt = np.array([])
             fold_path = self.modelpath + '/%s' % cv_name
             predictions = pd.DataFrame(columns=class_labels.values())
@@ -993,8 +1149,9 @@ class ModelDataCollection:
             for i_fold, (train_index, test_index) in enumerate(cv):
                 x_test, fold_trgt = lofar2image(data, trgt, test_index,
                                                 image_window, image_window, run_indices_info=run_info)
-
-                model = load_model(fold_path + '/best_states/' + '/%i_fold.h5' % i_fold)
+                model = OldKerasModel(self.params)
+                print fold_path + '/best_states/' + '/%i_fold.h5' % i_fold
+                model.load(fold_path + '/best_states/' + '/%i_fold.h5' % i_fold)
                 prediction = model.predict(x_test)
 
                 del model
@@ -1009,8 +1166,10 @@ class ModelDataCollection:
                 gt = np.concatenate([gt, fold_trgt], axis=0)
 
                 gc.collect()
+                K.clear_session()
+
             preds = prediction_pd.reindex(pd.MultiIndex.from_tuples(prediction_pd.index.values))
-            preds.to_csv(fold_path + '/pred.csv')
+            preds.to_csv(fold_path + '/predictions.csv')
 
     def _renameIndexLevels(self):
         """Retro-compatibility function. IndexLevels will be renamed soon"""

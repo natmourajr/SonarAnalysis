@@ -1377,7 +1377,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
     def loadData(self, dataset):
         """Load dataset for model use
-
         Args:
         dataset(tuple): (samples, labels, unique(labels))
         """
@@ -1390,7 +1389,7 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         self.fold_config = folds
         self.n_folds = len(folds)
 
-    def train(self, transform_fn, preprocessing_fn, fold_mode='shuffleRuns', fold_balance='class_weights', novelty_classes= None,
+    def train(self, transform_fn, scaler, fold_mode='shuffleRuns', fold_balance='class_weights', novelty_classes= None,
               verbose=(0, 0, 0)):
 
         novelty_classes = novelty_classes or [None]
@@ -1416,68 +1415,89 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                     pass
 
             start = time.time()
-            model_results = np.array(
-                map(lambda cls: self._fitModel(model,
+            # model_results = np.array(
+            #     map(lambda cls: self._fitModel(model,
+            #                                    data,
+            #                                    trgt,
+            #                                    class_labels,
+            #                                    transform_fn,
+            #                                    preprocessing_fn,
+            #                                    novelty_cls=cls,
+            #                                    verbose=verbose[1],
+            #                                    fold_balance=fold_balance),
+            #         novelty_classes),
+            #     dtype=object)
+            #
+            # self._saveResults(model, model_results, novelty_classes, class_labels)
+            for nv_cls in novelty_classes:
+                model_results = self._fitModel(model,
                                                data,
                                                trgt,
                                                class_labels,
                                                transform_fn,
-                                               preprocessing_fn,
-                                               novelty_cls=cls,
-                                               verbose=verbose[1]),
-                    novelty_classes),
-                dtype=object)
+                                               scaler,
+                                               nv_cls,
+                                               verbose=verbose[1],
+                                               fold_balance=fold_balance)
 
-            self._saveResults(model, model_results, novelty_classes, class_labels)
 
             if verbose[0]:
                 end = time.time()
                 print 'Training: %i (seg) / %i (min) /%i (hours)' % (
                 end - start, (end - start) / 60, (end - start) / 3600)
 
-    def _fitModel(self, model, data, trgt, class_labels, transform_fn, preprocessing_fn=None, novelty_cls=None,
-                  verbose=False):
+    def _fitModel(self, model, data, trgt, class_labels, transform_fn, scaler=None, novelty_cls=None,
+                  verbose=False, fold_balance = None):
         # from pympler.tracker import SummaryTracker
         # tracker = SummaryTracker()
-
         n_classes = len(class_labels)
-
         if not novelty_cls is None:
             novelty_path_offset = '/' + class_labels[novelty_cls] + '/'
         else:
             novelty_path_offset = ''
 
-        if model.status == 'Untrained':
-            model_history = np.empty(self.n_folds, dtype=np.ndarray)
-            model_predictions = np.empty(self.n_folds, dtype=np.ndarray)
-        else:
-            model_history = np.load(model.model_recovery_history)
-            model_predictions = np.load(model.model_recovery_predictions)
-        trained_folds = map(self._parseFoldNumber, model.trained_folds_files)
+        # if model.status == 'Untrained':
+        model_history = np.empty(self.n_folds, dtype=np.ndarray)
+        model_predictions = np.empty(self.n_folds, dtype=np.ndarray)
+        # else:
+            # model_history = np.load(model.model_recovery_history)
+            # model_predictions = np.load(model.model_recovery_predictions)
 
-        print model.status
-        print trained_folds
+        #trained_folds = map(self._parseFoldNumber, model.trained_folds_files[3])[0]
+        #trained_folds = self._parseFoldNumber(model.trained_folds_files[3])
+
+        #print model.status
+        # print trained_folds
+        trained_folds = []
 
         for fold_count, (train_index, test_index) in enumerate(self.fold_config):
             if fold_count in trained_folds:
                 continue
 
-            x_train , y_train = transform_fn(all_data=data, all_trgt=trgt,
-                                            index_info=train_index, info='train')
-            x_test, y_test = transform_fn(all_data=data, all_trgt=trgt,
+            if not scaler is None:
+                print 'Scaling'
+                scaler.fit(data[train_index])
+                norm_data = scaler.transform(data)
+            else:
+                norm_data = data
+
+            x_train , y_train = transform_fn(all_data=norm_data, all_trgt=trgt,
+                                             index_info=train_index, info='train')
+            x_test, y_test = transform_fn(all_data=norm_data, all_trgt=trgt,
                                           index_info=test_index, info='val')
 
-            if preprocessing_fn is not None:
-                x_train, y_train = preprocessing_fn(x_train, y_train)
-                x_test, y_test = preprocessing_fn(x_test, y_test)
-
             x_train = x_train[y_train != novelty_cls]
+            x_test_nv = x_test
             x_test = x_test[y_test != novelty_cls]
 
             y_train = y_train[y_train != novelty_cls]
+            y_test_nv = y_test
             y_test = y_test[y_test != novelty_cls]
 
-            class_weights = self._getGradientWeights(y_train, mode='standard', novelty_cls=novelty_cls)
+            if fold_balance == 'class_weights':
+                class_weights = self._getGradientWeights(y_train, mode='standard', novelty_cls=novelty_cls)
+            else:
+                class_weights = None
 
             y_test = Functions.NpUtils.DataTransformation.trgt2categorical(y_test, n_classes)
             y_train = Functions.NpUtils.DataTransformation.trgt2categorical(y_train, n_classes)
@@ -1488,9 +1508,12 @@ class ConvolutionTrainFunction(ConvolutionPaths):
 
             if verbose:
                 print "Fold: " + str(fold_count) + '\n'
-                print "Class Weights:"
-                for cls in class_weights:
-                    print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+                if not class_weights is None:
+                    print "Class Weights:"
+                    for cls in class_weights:
+                        print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+                else:
+                    print "Balanced classes"
 
             # PASSAR PARA TRAINPARAMETERS
             # TODO pass novelty path creation to ModelPath class
@@ -1498,7 +1521,6 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                 SystemIO.mkdir(model.model_best + novelty_path_offset)
             if not SystemIO.exists(model.model_files + novelty_path_offset):
                 SystemIO.mkdir(model.model_files + novelty_path_offset)
-
             bestmodel = callbacks.ModelCheckpoint(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count,
                                                   monitor='val_loss', mode='min', verbose=1, save_best_only=True)
 
@@ -1510,18 +1532,19 @@ class ConvolutionTrainFunction(ConvolutionPaths):
                                                   class_weight=class_weights, verbose=verbose,
                                                   max_restarts=4, restart_tol=0.60)
 
-            model.save(model.model_files + novelty_path_offset + '/%i_fold.h5' % fold_count)
+            model.save(model.model_files + novelty_path_offset  + '/%i_fold.h5' % fold_count)
             model.model = load_model(model.model_best + novelty_path_offset + '/%i_fold.h5' % fold_count)
 
-            model_predictions[fold_count] = model.predict(x_test)
-            if not novelty_cls is None:
+            model_predictions[fold_count] = model.predict(x_test_nv)
+            print model_predictions[fold_count].shape
+            if not novelty_cls is None: # Add NaN to novelty class column and correct labels column
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count][:, :novelty_cls],
                      np.repeat(np.nan, model_predictions[fold_count].shape[0])[:, np.newaxis],
                      model_predictions[fold_count][:, novelty_cls:],
-                     np.array(y_test.argmax(axis=1)[:,np.newaxis], dtype=np.int)],
+                     np.array(y_test_nv[:,np.newaxis], dtype=np.int)],
                     axis=1)
-            else:
+            else: # Add correct labels column
                 model_predictions[fold_count] = np.concatenate(
                     [model_predictions[fold_count],
                      np.array(y_test.argmax(axis=1)[:, np.newaxis], dtype=np.int)],
@@ -1533,46 +1556,78 @@ class ConvolutionTrainFunction(ConvolutionPaths):
             if K.backend() == 'tensorflow':  # solve tf memory leak
                 K.clear_session()
 
+        self._saveResults(model, (model_history, model_predictions), novelty_cls, class_labels)
+
         os.remove(model.model_recovery_predictions)
         os.remove(model.model_recovery_history)
         return model_history, model_predictions
 
-    @staticmethod
-    def _parseFoldNumber(fold_str):
+
+    def _parseFoldNumber(self, fold_str):
+        print fold_str
+        if fold_str == 'ClassC':
+            list = os.listdir(self.models[0].model_files + '/' +  fold_str)
+            return map(self._parseFoldNumber, list)
         warn("Limit : [0,9]!")
+
         return int(fold_str[0])
 
+    # @staticmethod
+    # def _saveResults(model, model_results, novelty_classes, class_labels):
+    #     history_ar = [history for history, _ in model_results]
+    #     predictions_ar = [predictions for _, predictions in model_results]
+    #
+    #     column_names = class_labels.values()
+    #     column_names.append('Label')
+    #
+    #     predictions_pd = [[pd.DataFrame(fold_prediction, columns=column_names,
+    #                                     index=pd.MultiIndex.from_product(
+    #                                         [['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
+    #                        for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in
+    #                       zip(novelty_classes, predictions_ar)]
+    #     history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
+    #         [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
+    #                    for i_fold, fold_history in enumerate(history)] for nv_cls, history in
+    #                   zip(novelty_classes, history_ar)]
+    #
+    #     pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
+    #     pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
+    #
+    #     hist_file = model.model_history
+    #     preds_file = model.model_predictions
+    #
+    #     pd_pred.to_csv(preds_file, sep=',')
+    #     pd_hist.to_csv(hist_file, sep=',')
     @staticmethod
-    def _saveResults(model, model_results, novelty_classes, class_labels):
-        history_ar = [history for history, _ in model_results]
-        predictions_ar = [predictions for _, predictions in model_results]
-
+    def _saveResults(model, model_results, novelty_cls, class_labels):
+        history_ar = [history for history in model_results[0]]
+        predictions_ar = [predictions for predictions in model_results[1]]
 
         column_names = class_labels.values()
         column_names.append('Label')
 
-        predictions_pd = [[pd.DataFrame(fold_prediction, columns=column_names,
+        predictions_pd = [pd.DataFrame(fold_prediction, columns=column_names,
                                         index=pd.MultiIndex.from_product(
-                                            [['fold_%i' % i_fold], [nv_cls], range(fold_prediction.shape[0])]))
-                           for i_fold, fold_prediction in enumerate(prediction)] for nv_cls, prediction in
-                          zip(novelty_classes, predictions_ar)]
-        history_pd = [[pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
-            [['fold_%i' % i_fold], [nv_cls], range(len(fold_history['loss']))]))
-                       for i_fold, fold_history in enumerate(history)] for nv_cls, history in
-                      zip(novelty_classes, history_ar)]
+                                            [['fold_%i' % i_fold], range(fold_prediction.shape[0])]))
+                           for i_fold, fold_prediction in enumerate(predictions_ar)]
+        history_pd = [pd.DataFrame(fold_history, index=pd.MultiIndex.from_product(
+            [['fold_%i' % i_fold], range(len(fold_history['loss']))]))
+                       for i_fold, fold_history in enumerate(history_ar)]
 
+        pd_pred = pd.concat(predictions_pd)
+        pd_hist = pd.concat(predictions_pd)
 
-
-        pd_pred = pd.concat([pd.concat(predictions) for predictions in predictions_pd])
-        pd_hist = pd.concat([pd.concat(predictions) for predictions in history_pd])
-
-        hist_file = model.model_history
-        preds_file = model.model_predictions
+        if not novelty_cls is None:
+            hist_file = model.model_history[:-3] + '%i.csv' % novelty_cls
+            preds_file = model.model_predictions[:-3] + '%i.csv' % novelty_cls
+        else:
+            hist_file = model.model_history
+            preds_file = model.model_predictions
 
         pd_pred.to_csv(preds_file, sep=',')
         pd_hist.to_csv(hist_file, sep=',')
 
-    def _getGradientWeights(self, y_train, mode = 'standard', novelty_cls=None):
+    def _getGradientWeights(self, y_train, mode='standard', novelty_cls=None):
         cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)
         min_class = min(event_count)
         if not novelty_cls is None:
@@ -1581,3 +1636,165 @@ class ConvolutionTrainFunction(ConvolutionPaths):
         print cls_indices
         return {cls_index: float(min_class) / cls_count
                 for cls_index, cls_count in zip(cls_indices, event_count)}
+
+
+
+class GridSearchCV():
+    def __init__(self, novelty_detection = False, nested_cv = False, store_results=True):
+        pass
+
+class NoveltyDetetionCV():
+    def __init__(self, novelty_classes, novelty_path):
+        self.novelty_classes = novelty_classes
+
+class CVIterator():
+    def __init__(self, cv, all_data, all_trgt, verbose=1):
+        self.cv = cv
+        self.verbose = verbose
+        self.all_data = all_data
+        self.all_trgt = all_trgt
+
+    def __iter__(self):
+        return self.next()
+
+    def next(self):
+        for i_fold, (train, test) in enumerate(self.cv):
+            X = self.all_data[train]
+            y = self.all_trgt[train]
+
+            X_test = self.all_data[test]
+            y_test = self.all_trgt[test]
+            validation_data = (X_test, y_test)
+
+            if self.verbose:
+                print('Fold %i' % i_fold)
+                print('\tTrain: %s' % X.shape)
+                print('\tTest: %s' % X_test.shape)
+
+            yield X, y, validation_data
+        raise StopIteration
+
+    def apply(self, pipeline):
+        return [pipeline.apply(X, y, validation_data) for X,y, validation_data in self]
+
+
+class Pipeline:
+    def __init__(self, steps):
+        self.steps = steps
+        self._validate_steps()
+
+    def _validate_steps(self):
+        names, estimators = zip(*self.steps)
+
+        # validate estimators
+        transformers = estimators[:-1]
+        estimator = estimators[-1]
+
+        for t in transformers:
+            if t is None:
+                continue
+            if (not (hasattr(t, "fit") or hasattr(t, "fit_transform")) or not
+            hasattr(t, "transform")):
+                raise TypeError("All intermediate steps should be "
+                                "transformers and implement fit and transform."
+                                " '%s' (type %s) doesn't" % (t, type(t)))
+
+        # Allow last estimator to be None as an identity transformation
+        if estimator is not None and not hasattr(estimator, "fit"):
+            raise TypeError("Last step of Pipeline should implement fit. "
+                            "'%s' (type %s) doesn't"
+                            % (estimator, type(estimator)))
+
+    def _fit_transformers(self, X, y):
+        names, estimators = zip(*self.steps)
+        transformers = estimators[:-1]
+
+        for t in transformers:
+            t.fit(X, y)
+
+    def _transform(self, X, y):
+        names, estimators = zip(*self.steps)
+        transformers = estimators[:-1]
+
+        X_t, y_t = X, y
+        for t in transformers:
+            X_t, y_t, val_t = t.transform(X_t, y_t)
+
+        return X_t, y_t
+
+    def fit(self, X, y, validation_data=None):
+        self._fit_transformers(X, y)
+        X_t, y_t = self.transform(X, y)
+        if validation_data is not None:
+            val_t_0, val_t_1 = self._transform(validation_data[0],
+                                              validation_data[1])
+            val_t = (val_t_0, val_t_1)
+        else:
+            val_t = None
+        self.final_estimator.fit(X_t, y_t, val_t)
+
+    @property
+    def final_estimator(self):
+        return self.steps[-1][1]
+
+    def predict(self, X, y = None, transform = True):
+        if transform:
+            X_t, _, _  = self._transform(X, y, None)
+        return self.final_estimator.predict(X_t)
+
+
+class CNNTraining(ConvolutionPaths):
+    def __init__(self, model, saved_best_path = None, saved_state_path=None):
+        # Path variables
+        super(ConvolutionTrainFunction, self).__init__()
+
+        self.model = model
+        self.saved_best_path = saved_best_path
+        self.saved_state_path = saved_state_path
+
+    def train(self, X, y, validation_data=None, class_weights=True, verbose=(0, 0, 0)):
+        data, trgt, class_labels = self.dataset
+
+        model = self.model
+
+        start = time.time()
+        model_results = self._fitModel(model,
+                                       X,
+                                       y,
+                                       validation_data,
+                                       class_labels,
+                                       class_weights = class_weights,
+                                       verbose=verbose[1])
+        if verbose[0]:
+            end = time.time()
+            print 'Training: %i (seg) / %i (min) /%i (hours)' % (
+            end - start, (end - start) / 60, (end - start) / 3600)
+
+    def _fitModel(self, model, X, y, validation_data=None, verbose=False, class_weights=True):
+        if class_weights:
+            class_weights = self._getGradientWeights(y, mode='standard')
+            if verbose:
+                print "Class Weights:"
+                for cls in class_weights:
+                    print "\t %s: %i%%" % (cls, 100 * class_weights[cls])
+        else:
+            class_weights = None
+
+        if not self.saved_best_path is None:
+            pass
+
+        model.callbacks.add(callbacks.ModelCheckpoint(self.saved_best_path,
+                                              monitor='val_loss', mode='min', verbose=1, save_best_only=True))
+
+        model.callbacks.add(callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=1, mode='min'))
+
+        model.build()
+        model.fit(X, y,
+                  validation_data=validation_data, callbacks = [],
+                  class_weight=class_weights, verbose=verbose,
+                  max_restarts=4, restart_tol=0.60)
+
+        if not self.saved_state_path is None:
+            model.save(self.saved_state_path)
+
+        return model
