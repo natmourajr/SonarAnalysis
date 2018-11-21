@@ -69,7 +69,7 @@ class NNNoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
 
         sysCall = "python neuralnetwork_train.py --layer {0} --novelty {1} --threads {2} --type {3} --hiddenNeurons {4} --neuronsVariationStep {5} --modelhash {6}".format(
             layer, inovelty, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
-        print sysCall
+        print(sysCall)
         os.system(sysCall)
         
         duration = str(timedelta(seconds=float(time.time() - startTime)))

@@ -22,7 +22,7 @@ trainingType = args.type
 step = int(args.neuronsVariationStep)
 layer = int(args.layer)
 
-from SAENoveltyDetectionAnalysis import SAENoveltyDetectionAnalysis
+from Packages.NoveltyDetection.StackedAutoEncoders.SAENoveltyDetectionAnalysis import SAENoveltyDetectionAnalysis
 
 training_parameters = {"Technique": "StackedAutoEncoder"}
 
@@ -40,7 +40,7 @@ trn_trgt = analysis.trn_trgt
 trn_trgt_sparse = analysis.trn_trgt_sparse
 
 hidden_neurons = [int(ineuron) for ineuron in args.hiddenNeurons.split('x')]
-neurons_mat = [1, 2] + range(step,hidden_neurons[layer-1]+step,step)
+neurons_mat = [1, 2] + list(range(step,hidden_neurons[layer-1]+step,step))
 
 if (trainingType == "normal"):
     if (fineTuning):
@@ -62,7 +62,7 @@ if (trainingType == "normal"):
                                       layer=layer)
 elif (trainingType == "neuronSweep"):
     if (not neurons_mat):
-        print "[-] Neurons array should not be empty for this type of training"
+        print("[-] Neurons array should not be empty for this type of training")
         exit()
     for ineuron in neurons_mat:
         if (fineTuning):
@@ -154,7 +154,7 @@ elif (trainingType == "foldSweep"):
         p.close()
         p.join()
 else:
-    print "[-] %s is not set as a type of training"%trainingType
+    print("[-] {} is not set as a type of training".format(trainingType))
     exit()
 
-print "[+] Training finished"
+print("[+] Training finished")

@@ -11,5 +11,4 @@ def getGradientWeights(y_train):
     """
     cls_indices, event_count = np.unique(np.array(y_train), return_counts=True)
     min_class = min(event_count)
-    return {cls_index: float(min_class) / cls_count
-            for cls_index, cls_count in zip(cls_indices, event_count)}
+    return {cls_index: float(min_class) / cls_count for cls_index, cls_count in zip(cls_indices, event_count)}

@@ -103,7 +103,7 @@ class StackedAutoEncoders:
             hidden_neurons = [1]
         model = None
         if layer > len(hidden_neurons):
-            print "[-] Error: The parameter layer must be less or equal to the size of list hidden_neurons"
+            print("[-] Error: The parameter layer must be less or equal to the size of list hidden_neurons")
             return 1
         if layer == 1:
             neurons_str = self.get_neurons_str(data, hidden_neurons[:layer])
@@ -181,8 +181,8 @@ class StackedAutoEncoders:
                 hidden_neurons[i] = 1
 
         if (layer <= 0) or (layer > len(hidden_neurons)):
-            print "[-] Error: The parameter layer must be greater than zero and less" \
-                  " or equal to the length of list hidden_neurons"
+            print("[-] Error: The parameter layer must be greater than zero and less" +
+                  " or equal to the length of list hidden_neurons")
             return -1
 
         norm_data = self.normalize_data(data, ifold)
@@ -230,8 +230,8 @@ class StackedAutoEncoders:
             if hidden_neurons[i] == 0:
                 hidden_neurons[i] = 1
         if (layer <= 0) or (layer > len(hidden_neurons)):
-            print "[-] Error: The parameter layer must be greater than zero and less " \
-                  "or equal to the length of list hidden_neurons"
+            print("[-] Error: The parameter layer must be greater than zero and less " +
+                  "or equal to the length of list hidden_neurons")
             return -1
 
         neurons_str = self.get_neurons_str(data, hidden_neurons[:layer])
@@ -241,7 +241,7 @@ class StackedAutoEncoders:
         file_name = '%s_fold_%i_model.h5' % (model_str, ifold)
         if os.path.exists(file_name):
             if self.verbose:
-                print 'File %s exists' % file_name
+                print('File %s exists' % file_name)
             # load model
             file_name = '%s_fold_%i_model.h5' % (model_str, ifold)
             classifier = load_model(file_name, custom_objects={
@@ -259,12 +259,12 @@ class StackedAutoEncoders:
         trn_desc = {}
 
         for i_init in range(self.parameters["HyperParameters"]["n_inits"]):
-            print 'Autoencoder - Layer: %i - Topology: %s - Fold %i of %i Folds -  Init %i of %i Inits' % (layer,
+            print('Autoencoder - Layer: %i - Topology: %s - Fold %i of %i Folds -  Init %i of %i Inits' % (layer,
                                                                                                            neurons_str,
                                                                                                            ifold + 1,
                                                                                                            self.parameters["HyperParameters"]["n_folds"],
                                                                                                            i_init + 1,
-                                                                                                           self.parameters["HyperParameters"]["n_inits"])
+                                                                                                           self.parameters["HyperParameters"]["n_inits"]))
             model = Sequential()
             norm_data = self.normalize_data(data, ifold)
             proj_all_data = norm_data
@@ -412,8 +412,8 @@ class StackedAutoEncoders:
             if hidden_neurons[i] == 0:
                 hidden_neurons[i] = 1
         if (layer <= 0) or (layer > len(hidden_neurons)):
-            print "[-] Error: The parameter layer must be greater than zero and less " \
-                  "or equal to the length of list hidden_neurons"
+            print("[-] Error: The parameter layer must be greater than zero and less " +
+                  "or equal to the length of list hidden_neurons")
             return -1
 
         # load model
@@ -427,7 +427,7 @@ class StackedAutoEncoders:
             classifier = load_model(file_name, custom_objects={
                 '%s' % self.parameters["HyperParameters"]["loss"]: self.lossFunction})
         except:
-            print '[-] Error: File or Directory not found. Path: {}'.format(file_name)
+            print('[-] Error: File or Directory not found. Path: {}'.format(file_name))
             ifold, classifier, trn_desc = self.train_classifier(data=data, trgt=trgt, ifold=ifold, hidden_neurons=hidden_neurons, layer=layer)
         return classifier
 
@@ -440,8 +440,8 @@ class StackedAutoEncoders:
                 hidden_neurons[i] = 1
 
         if (layer <= 0) or (layer > len(hidden_neurons)):
-            print "[-] Error: The parameter layer must be greater than zero and less " \
-                  "or equal to the length of list hidden_neurons"
+            print("[-] Error: The parameter layer must be greater than zero and less " +
+                  "or equal to the length of list hidden_neurons")
             return -1
 
         # Turn trgt to one-hot encoding
@@ -455,7 +455,7 @@ class StackedAutoEncoders:
         file_name = '{}_fold_{:d}_model.h5'.format(model_str, ifold)
         if os.path.exists(file_name):
             if self.verbose:
-                print 'File {} exists'.format(file_name)
+                print('File {} exists'.format(file_name))
             # load model
             file_name = '%s_fold_%i_model.h5' % (model_str, ifold)
             classifier = load_model(file_name, custom_objects={
@@ -475,12 +475,12 @@ class StackedAutoEncoders:
         trn_desc = {}
 
         for i_init in range(self.parameters["HyperParameters"]["n_inits"]):
-            print 'Classifier - Layer: %i - Topology: %s - Fold: %i of %i Folds -  Init: %i of %i Inits' % (layer,
+            print('Classifier - Layer: %i - Topology: %s - Fold: %i of %i Folds -  Init: %i of %i Inits' % (layer,
                                                                                                             neurons_str,
                                                                                                             ifold + 1,
                                                                                                             self.parameters["HyperParameters"]["n_folds"],
                                                                                                             i_init + 1,
-                                                                                                            self.parameters["HyperParameters"]["n_inits"])
+                                                                                                            self.parameters["HyperParameters"]["n_inits"]))
             # Start the model
             model = Sequential()
             # Add layers

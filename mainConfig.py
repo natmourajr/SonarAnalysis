@@ -12,7 +12,7 @@ elif CONFIG["osType"] == "Windows":
 else:
     exit(0)
 
-CONFIG["SONAR_WORKSPACE"] = os.path.join(CONFIG["homePath"], "Workspace", "SonarAnalysis_2")
+CONFIG["SONAR_WORKSPACE"] = os.path.join(CONFIG["homePath"], "Workspace", "SonarAnalysis")
 CONFIG["INPUTDATAPATH"] = os.path.join(CONFIG["homePath"], "Public", "Marinha", "Data")
 CONFIG["OUTPUTDATAPATH"] = os.path.join(CONFIG["SONAR_WORKSPACE"], "Results")
 
@@ -23,4 +23,4 @@ if not os.path.exists(CONFIG["OUTPUTDATAPATH"]):
         for package in os.walk(os.path.join(CONFIG["SONAR_WORKSPACE"], "Packages")).next()[1]:
             os.mkdir(os.path.join(CONFIG["OUTPUTDATAPATH"], package))
     except Exception as ex:
-        print "Error: {0}".format(ex.message)
+        print("Error: {0}".format(ex.message))
