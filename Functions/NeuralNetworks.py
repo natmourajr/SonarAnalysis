@@ -25,6 +25,7 @@ from Functions.lossWeights import getGradientWeights
 import multiprocessing
 
 num_processes = multiprocessing.cpu_count()
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 #K.set_session(K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=4, inter_op_parallelism_threads=4)))
 

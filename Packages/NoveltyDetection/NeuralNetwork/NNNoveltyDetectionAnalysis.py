@@ -76,7 +76,7 @@ class NNNoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         message = "Technique: {}\n".format(self.parameters["Technique"])
         message = message + "Training Type: Neuron Sweep\n"
         message = message + "Novelty Class: {}\n".format(self.class_labels[inovelty])
-        message = message + "Hash: {}\n".format(self.model_hash)
+        message = message + "Hash: {}\n".format(model_hash)
         message = message + "Duration: {}\n".format(duration)
         try:
             my_bot.sendMessage(message)

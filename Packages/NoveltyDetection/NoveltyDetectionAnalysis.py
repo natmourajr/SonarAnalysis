@@ -30,33 +30,65 @@ from Functions import DataHandler as dh
 class NoveltyDetectionAnalysis(object):
     def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=True):
         
+        self.parameters = parameters
+        self.model_hash = model_hash
+        self.load_hash = load_hash
+        self.verbose = verbose
+        
         self.all_data = None
         self.all_trgt = None
         self.all_trgt_sparse = None
         self.class_labels = None
-        self.verbose = verbose
         
         # Enviroment variables
         self.DATA_PATH = noveltyDetectionConfig.CONFIG['OUTPUTDATAPATH']
         self.RESULTS_PATH = noveltyDetectionConfig.CONFIG['PACKAGE_NAME']
 
         # paths to export results
-        
-        if load_hash and model_hash is not None:
-            self.model_hash = model_hash
+        if self.load_hash and self.model_hash is not None:
             self.baseResultsPath = os.path.join(self.RESULTS_PATH, parameters["Technique"], "outputs", self.model_hash)
             self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
             self.loadTrainParametersByHash(model_hash)
+            
+            self.setOutputFolders()
+            self.setDatabaseParameters()
+            self.setNfolds()
         else:
-            if (parameters == None):
+            self.setParameters(parameters)
+        
+        if load_data:
+            self.loadData()
+
+        self.CVO = self.getCVO()
+
+        # For multiprocessing purpose
+        self.num_processes = multiprocessing.cpu_count()
+
+    def setParameters(self, parameters=None):
+        if (parameters == None):
                 print("Parameters must not be None!")
                 exit()
-            self.parameters = parameters
-            # Set the hash of the JSON text with the parameters
-            self.model_hash = hashlib.sha256(json.dumps(parameters)).hexdigest()
-            self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
-            self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
-        
+        self.parameters = parameters
+        # Set the hash of the JSON text with the parameters
+        self.model_hash = hashlib.sha256(json.dumps(parameters)).hexdigest()
+        self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
+        self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
+
+        self.setOutputFolders()
+        self.setDatabaseParameters()
+        self.setNfolds()
+
+        self.saveParameters()
+    
+    def saveParameters(self):
+        # Save parameters file
+        if not os.path.exists(self.parameters_file):
+            with open(self.parameters_file, "w") as f:
+                print ("Saving " + self.parameters_file)
+                json.dump(self.parameters, f)
+    
+    
+    def setOutputFolders(self):
         self.analysis_output_folder = os.path.join(self.baseResultsPath, "AnalysisFiles")
         self.pictures_output_folder = os.path.join(self.baseResultsPath, "Pictures")
         
@@ -71,13 +103,8 @@ class NoveltyDetectionAnalysis(object):
         if not os.path.exists(self.pictures_output_folder):
             print ("Creating " + self.pictures_output_folder)
             os.makedirs(self.pictures_output_folder)
-            
-        # Save parameters file
-        if not os.path.exists(self.parameters_file):
-            with open(self.parameters_file, "w") as f:
-                print ("Saving " + self.parameters_file)
-                json.dump(self.parameters, f)
-            
+    
+    def setDatabaseParameters(self):
         # Database caracteristics
         self.database = self.parameters['InputDataConfig']['database']
         self.n_pts_fft = int(self.parameters['InputDataConfig']['n_pts_fft'])
@@ -90,16 +117,9 @@ class NoveltyDetectionAnalysis(object):
         self.development_flag = bool(self.parameters['DevelopmentMode'])
         self.development_events = int(self.parameters['DevelopmentEvents'])
 
+    def setNfolds(self):
         self.n_folds = self.parameters["HyperParameters"]["n_folds"]
-        
-        if load_data:
-            self.loadData()
-
-        self.CVO = self.getCVO()
-
-        # For multiprocessing purpose
-        self.num_processes = multiprocessing.cpu_count()
-
+    
     def loadData(self):
         m_time = time.time()
         # Check if LofarData has already been created...
