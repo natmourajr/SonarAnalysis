@@ -12,9 +12,12 @@ import getpass
 import shutil
 import socket
 import warnings
+from collections import OrderedDict
 import numpy as np
 import scipy.io.wavfile as wav
-
+import pyaudio
+import queue
+from threading import Thread
 
 class AudioData:
     def __init__(self, inputpath, database):
@@ -60,7 +63,6 @@ class AudioData:
                                     for runfile,rundata in zip(runfiles,cls_raw_data)}
             data_fs[cls_folder] = {runfile:fs
                                    for runfile, fs in zip(runfiles, cls_data_fs)}
-
         self.raw_data = raw_data
         self.data_fs = data_fs
         self.datainfo = datainfo
@@ -112,4 +114,48 @@ def read_audio_file(filepath):
 
     return signal, fs
 
+def threaded(fn):
+    """To use as decorator to make a function call threaded.
+    """
+    def wrapper(*args, **kwargs):
+        thread = Thread(target=fn, args=args, kwargs=kwargs)
+        thread.start()
+        return thread
 
+    return wrapper
+
+
+class AudioStream:
+    def __init__(self, rate=22050,channels=1,width=1):
+        self.buffer = queue.Queue()
+        self.record_on = True
+        self.stop_callback = False
+        p = pyaudio.PyAudio()
+        stream = p.open(format=p.get_format_from_width(width),
+                        channels=channels,
+                        rate=rate,
+                        input=True,
+                        stream_callback=self.callback)
+        self.stream = stream
+        self.start=True
+
+    def callback(self, in_data, frame_count, time_info, status):
+        if self.record_on:
+            self.buffer.put(in_data)
+
+        if self.stop_callback:
+            callback_flag = pyaudio.paComplete
+        else:
+            callback_flag = pyaudio.paContinue
+
+        return in_data, callback_flag
+
+    @threaded
+    def start(self):
+        self.stream.start_stream()
+        while self.start:
+            continue
+        self.start=True
+
+    def stop(self):
+        self.start=False
