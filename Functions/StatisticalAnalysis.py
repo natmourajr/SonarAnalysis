@@ -12,21 +12,21 @@ def EstPDF(data, bins=np.array([-1,0, 1]), mode='kernel', kernel='epanechnikov',
     # kernels = 'epanechnikov','gaussian', 'tophat','exponential', 'linear', 'cosine'
     if mode == 'hist':
         if verbose:
-            print 'EstPDF: Histogram Mode'
+            print('EstPDF: Histogram Mode')
         [y,pts] = np.histogram(data,bins=bins,density=True)
         bins_centers = pts[0:-1]+np.diff(pts)
         pdf = y*np.diff(pts)
         return [pdf,bins_centers]
     if mode == 'kernel':
         if verbose:
-            print 'EstPDF: Kernel Mode'
+            print('EstPDF: Kernel Mode')
         if kernel is None:
             if verbose:
-                print 'No kernel defined'
+                print('No kernel defined')
             return -1
         if kernel_bw is None:
             if verbose:
-                print 'No kernel bandwidth defined'
+                print('No kernel bandwidth defined')
             return -1
         kde = (KernelDensity(kernel=kernel,algorithm='auto',bandwidth=kernel_bw).fit(data))
         aux_bins = bins

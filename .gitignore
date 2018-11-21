@@ -97,3 +97,6 @@ Results/*
 # For Mac Systems
 ._.DS_Store
 .DS_Store
+
+.vscode
+.idea

@@ -37,7 +37,7 @@ trn_trgt_sparse = analysis.trn_trgt_sparse
 models = analysis.models
 
 hidden_neurons = [int(ineuron) for ineuron in args.hiddenNeurons.split('x')]
-neurons_mat = [1] + range(step,hidden_neurons[layer-1]+step,step)
+neurons_mat = [1] + list(range(step,hidden_neurons[layer-1]+step,step))
 
 if (trainingType == "normal"):
     for ifold in range (analysis.n_folds):
@@ -50,7 +50,7 @@ if (trainingType == "normal"):
                                )
 elif (trainingType == "neuronSweep"):
     if (not neurons_mat):
-        print "[-] Neurons array should not be empty for this type of training"
+        print("[-] Neurons array should not be empty for this type of training")
         exit()
     for ineuron in neurons_mat:
         def train(ifold):
@@ -96,7 +96,7 @@ elif (trainingType == "foldSweep"):
     p.close()
     p.join()
 else:
-    print "[-] %s is not set as a type of training"%trainingType
+    print("[-] %s is not set as a type of training"%trainingType)
     exit()
 
-print "[+] Training finished"
+print("[+] Training finished")

@@ -6,9 +6,6 @@
 """
 import os
 import sys
-
-sys.path.insert(0, '..')
-
 import pickle
 import numpy as np
 import time
@@ -16,14 +13,15 @@ import string
 import json
 import multiprocessing
 
+from datetime import timedelta
+
 from keras.utils import np_utils
 from sklearn.externals import joblib
 from sklearn import preprocessing
 
+from Packages.NoveltyDetection.NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
+
 from Functions.StackedAutoEncoders import StackedAutoEncoders
-
-from NoveltyDetectionAnalysis import NoveltyDetectionAnalysis
-
 from Functions.telegrambot import Bot
 
 my_bot = Bot("lisa_thebot")
@@ -34,7 +32,7 @@ num_processes = multiprocessing.cpu_count()
 class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
 
     def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=False):
-        super(SAENoveltyDetectionAnalysis, self).__init__(parameters=parameters, model_hash=model_hash, load_hash=load_hash, load_data=load_data, verbose=verbose)
+        super().__init__(parameters=parameters, model_hash=model_hash, load_hash=load_hash, load_data=load_data, verbose=verbose)
         
         self.trn_data = {}
         self.trn_trgt = {}
@@ -75,17 +73,18 @@ class SAENoveltyDetectionAnalysis(NoveltyDetectionAnalysis):
         if len(hidden_neurons) > 1:
             for ineuron in hidden_neurons[1:]:
                 hiddenNeuronsStr = hiddenNeuronsStr + 'x' + str(ineuron)
-
-        sysCall = "python sae_train.py --layer {0} --novelty {1} --finetunning {2} --threads {3} --type {4} --hiddenNeurons {5} --neuronsVariationStep {6} --modelhash {7}".format(
+        packagePath = os.path.join(self.PACKAGE_PATH, "StackedAutoEncoders")
+        file_to_run = os.path.join(packagePath, "sae_train.py")
+        sysCall = "python " + file_to_run + " --layer {0} --novelty {1} --finetunning {2} --threads {3} --type {4} --hiddenNeurons {5} --neuronsVariationStep {6} --modelhash {7}".format(
             layer, inovelty, fineTuning, numThreads, trainingType, hiddenNeuronsStr, neurons_variation_step, model_hash)
-        print sysCall
+        print(sysCall)
         os.system(sysCall)
         duration = str(timedelta(seconds=float(time.time() - startTime)))
         
         message = "Technique: {}\n".format(self.parameters['Technique'])
         message = message + "Training Type: {}\n".format(trainingType)
-        message = message + "Novelty Class: {}\n".format(analysis.class_labels[inovelty])
-        message = message + "Hash: {}\n".format(analysis.model_hash)
+        message = message + "Novelty Class: {}\n".format(self.class_labels[inovelty])
+        message = message + "Hash: {}\n".format(self.model_hash)
         message = message + "Duration: {}\n".format(duration)
         try:
             my_bot.sendMessage(message)
