@@ -49,10 +49,10 @@ def factor2(num):
 
 #window_list = map(lambda e: pow(2,e), range(7,13,1))
 #overlap_list = map(factor2, window_list)
-window_list = [1024, 512, 256, 128]
+window_list = [2048, 1024, 512, 256, 128]
 overlap_list = [0]
 decimation_rate = 3
-spectrum_bins_left_list = [400, 205, 103, 52]
+spectrum_bins_left_list = [820,400, 205, 103, 52]
 
 
 # In[3]:
@@ -62,7 +62,8 @@ def lofar_iter(estimator, train_fun, verbose):
     results = {'window': [],
                'overlap': [],
                'fold': [],
-               'scores': []}
+               'scores': [],
+               'novelty': []}
     for (window, spectrum_bins_left), overlap in product(zip(window_list, spectrum_bins_left_list), overlap_list):
         print window
         skf = SonarRunsCV(10, os.path.join(audiodatapath, database), window)
@@ -91,11 +92,9 @@ def lofar_iter(estimator, train_fun, verbose):
 
         window_l = list(repeat(window, len(partial_results['scores'])))
         overlap_l = list(repeat(overlap, len(partial_results['scores'])))
-        print window_l
         results['window'].extend(window_l)
         results['overlap'].extend(overlap_l)
         for key in partial_results:
-            print key
             results[key].extend(partial_results[key])
             
     return results
@@ -115,12 +114,14 @@ import dill
 # c = ipp.Client()
 # c[:].use_dill()
 # dview = c[:]
+
+
 def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
     scores = list()
     fold = list()
     def train_fold(data):
-        i_fold, train, test = data
-        window_qtd=20
+        i_fold, train, test, nv_cls = data
+        window_qtd=10
         window_qtd_stride=5
         print np.unique(y)
 
@@ -138,7 +139,7 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
         # scaler.fit(X_train, y_train)
         # X_train = scaler.transform(X_train)
         # X_test = scaler.transform(X_test)
-        novelty_cls = 3
+        novelty_cls = nv_cls
         X_train = X_train[y_train != novelty_cls]
         X_test = X_test[y_test != novelty_cls]
         y_train = y_train[y_train != novelty_cls]
@@ -152,9 +153,13 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
             y_test = y_test[:, mask]
         elif y_train.shape[1] != 3:
             raise NotImplementedError
-
+        class_mapping = {0: 'ClassA',
+                         1: 'ClassB',
+                         2: 'ClassC',
+                         3: 'ClassD'}
+        print class_mapping[nv_cls]
         print y_test.shape
-        inner_cachedir = os.path.join(cachedir, 'ClassD', '%i_fold' % i_fold)
+        inner_cachedir = os.path.join(cachedir, class_mapping[nv_cls], '%i_fold' % i_fold)
         estimator.fit(X_train, y_train,
                       validation_split=0.1,
 #                      validation_data=(X_test, y_test),
@@ -163,14 +168,16 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
                       cachedir=inner_cachedir)
         print y_test.shape
         score = estimator.score(X_test, y_test)
-        return (i_fold, score)
+        return (i_fold, score, nv_cls)
 #         scores.append(score)
 #         fold.append(i_fold)
-    results = map(train_fold, [(i_fold, train, test) for i_fold, (train, test) in enumerate(cvo)])
+    results = map(train_fold, [(i_fold, train, test, cls) for i_fold, (train, test) in enumerate(cvo)
+                               for cls in [0,1,2,3]])
     #results = dview.map_sync(train_fold, [(i_fold, train, test) for i_fold, (train, test) in enumerate(cvo)])
-    fold,scores = map(list,zip(*results))
+    fold,scores, classes = map(list,zip(*results))
     return {'fold': fold,
-            'scores': scores}
+            'scores': scores,
+            'novelty': classes}
             
     
 
