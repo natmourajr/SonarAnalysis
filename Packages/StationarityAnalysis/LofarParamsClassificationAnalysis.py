@@ -7,18 +7,18 @@
 # #### Autor: Pedro Henrique Braga Lisboa (pedrohblisboa@gmail.com)
 # #### Laboratorio de Processamento de Sinais - UFRJ
 
-# In[1]:
-
 
 import sys
 import os
 import joblib
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+from Functions.CrossValidation import SonarRunsCV
 import pandas as pd
 
-from Functions.CrossValidation import SonarRunsCV
-
 sys.path.extend(['/home/pedrolisboa/Workspace/lps/LpsToolbox'])
+from multiprocessing import Pool
 from itertools import starmap, product
 from Functions.DataHandler import LofarDataset
 from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
@@ -35,11 +35,6 @@ results_path = os.getenv('PACKAGE_NAME')
 database = '4classes'
 
 
-# In[2]:
-
-
-# Load LOFAR data
-#dataobj = LofarDataset(data_path=datapath)
 def factor2(num):
     if num % 2 != 0:
         return [num // 2]
@@ -47,18 +42,14 @@ def factor2(num):
     factors.extend(factor2(num//2))
     return factors
 
-#window_list = map(lambda e: pow(2,e), range(7,13,1))
-#overlap_list = map(factor2, window_list)
-window_list = [2048, 1024, 512, 256, 128]
+
+window_list = [8192, 4096, 2048, 1024, 512, 256, 128]
 overlap_list = [0]
 decimation_rate = 3
-spectrum_bins_left_list = [820,400, 205, 103, 52]
+spectrum_bins_left_list = [3270, 1630, 820, 400, 205, 103, 52]
 
 
-# In[3]:
-
-
-def lofar_iter(estimator, train_fun, verbose):
+def lofar_iter(estimator, train_fun, pool, verbose):
     results = {'window': [],
                'overlap': [],
                'fold': [],
@@ -88,7 +79,7 @@ def lofar_iter(estimator, train_fun, verbose):
         cachedir = os.path.join('FullClassification', cvo_file[:-4])
 
         s_info = SonarRunsInfo(os.path.join(audiodatapath, database), window)
-        partial_results = train_fun(X,y, cvo, estimator, verbose, s_info, cachedir)
+        partial_results = train_fun(X,y, cvo, estimator, verbose, s_info, cachedir, pool)
 
         window_l = list(repeat(window, len(partial_results['scores'])))
         overlap_l = list(repeat(overlap, len(partial_results['scores'])))
@@ -98,97 +89,74 @@ def lofar_iter(estimator, train_fun, verbose):
             results[key].extend(partial_results[key])
             
     return results
-        
-        
-
-
-# In[4]:
 
 
 from Functions.NpUtils.Scores import spIndex, recall_score
-from sklearn.metrics import make_scorer
 scoring = {'sp': spIndex}
 scaler = StandardScaler()
-import ipyparallel as ipp
-import dill
-# c = ipp.Client()
-# c[:].use_dill()
-# dview = c[:]
 
-
-def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir):
+def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir, pool=None):
     scores = list()
     fold = list()
-    def train_fold(data):
-        i_fold, train, test, nv_cls = data
-        window_qtd=10
-        window_qtd_stride=5
-        print np.unique(y)
+    if pool is None:
+        results = map(train_fold, [(i_fold, train, test, cls, X, y, s_info, cachedir) for i_fold, (train, test) in enumerate(cvo)
+                                   for cls in [0, 1, 2, 3]])
+    else:
+        results = pool.map(train_fold, [(i_fold, train, test, cls, X, y, s_info, cachedir) for i_fold, (train, test) in enumerate(cvo)
+                                   for cls in [0, 1, 2, 3]])
 
-        X_train, y_train = lofar2image(X, y, train, window_qtd, window_qtd_stride, s_info)
-        X_test, y_test = lofar2image(X, y, test, window_qtd, window_qtd, s_info)
-        print np.unique(y_train)
-        print np.unique(y_test)
-        if verbose:
-            print('\t\t Fold %i' % i_fold)
-        # X_train = X[train]
-        # y_train = y[train]
-        #
-        # X_test = X[test]
-        # y_test = y[test]
-        # scaler.fit(X_train, y_train)
-        # X_train = scaler.transform(X_train)
-        # X_test = scaler.transform(X_test)
-        novelty_cls = nv_cls
-        X_train = X_train[y_train != novelty_cls]
-        X_test = X_test[y_test != novelty_cls]
-        y_train = y_train[y_train != novelty_cls]
-        y_test = y_test[y_test != novelty_cls]
-        y_train = to_categorical(y_train)
-        y_test = to_categorical(y_test)
-        mask = np.ones(4, dtype=bool)
-        mask[novelty_cls]=False
-        if y_train.shape[1] == 4:
-            y_train = y_train[:, mask]
-            y_test = y_test[:, mask]
-        elif y_train.shape[1] != 3:
-            raise NotImplementedError
-        class_mapping = {0: 'ClassA',
-                         1: 'ClassB',
-                         2: 'ClassC',
-                         3: 'ClassD'}
-        print class_mapping[nv_cls]
-        print y_test.shape
-        inner_cachedir = os.path.join(cachedir, class_mapping[nv_cls], '%i_fold' % i_fold)
-        estimator.fit(X_train, y_train,
-                      validation_split=0.1,
-#                      validation_data=(X_test, y_test),
-                      n_inits=1,
-                      verbose=verbose,
-                      cachedir=inner_cachedir)
-        print y_test.shape
-        score = estimator.score(X_test, y_test)
-        return (i_fold, score, nv_cls)
-#         scores.append(score)
-#         fold.append(i_fold)
-    results = map(train_fold, [(i_fold, train, test, cls) for i_fold, (train, test) in enumerate(cvo)
-                               for cls in [0,1,2,3]])
-    #results = dview.map_sync(train_fold, [(i_fold, train, test) for i_fold, (train, test) in enumerate(cvo)])
+    # results = dview.map_sync(train_fold, [(i_fold, train, test) for i_fold, (train, test) in enumerate(cvo)])
     fold,scores, classes = map(list,zip(*results))
     return {'fold': fold,
             'scores': scores,
             'novelty': classes}
-            
-    
 
 
-# In[ ]:
+def train_fold(data):
+    i_fold, train, test, nv_cls, X, y, s_info, cachedir = data
+    window_qtd=10
+    window_qtd_stride=5
 
+    print i_fold
+    print nv_cls
+    X_train, y_train = lofar2image(X, y, train, window_qtd, window_qtd_stride, s_info)
+    X_test, y_test = lofar2image(X, y, test, window_qtd, window_qtd, s_info)
+    if verbose:
+        print('\t\t Fold %i' % i_fold)
+
+    novelty_cls = nv_cls
+    X_train = X_train[y_train != novelty_cls]
+    X_test = X_test[y_test != novelty_cls]
+    y_train = y_train[y_train != novelty_cls]
+    y_test = y_test[y_test != novelty_cls]
+    y_train = to_categorical(y_train)
+    y_test = to_categorical(y_test)
+
+    mask = np.ones(4, dtype=bool)
+    mask[novelty_cls]=False
+    if y_train.shape[1] == 4:
+        y_train = y_train[:, mask]
+        y_test = y_test[:, mask]
+    elif y_train.shape[1] != 3:
+        raise NotImplementedError
+
+    class_mapping = {0: 'ClassA',
+                     1: 'ClassB',
+                     2: 'ClassC',
+                     3: 'ClassD'}
+    inner_cachedir = os.path.join(cachedir, class_mapping[nv_cls], '%i_fold' % i_fold)
+    estimator.fit(X_train, y_train,
+                  validation_split=0.1,
+                  # validation_data=(X_test, y_test),
+                  n_inits=1,
+                  verbose=verbose,
+                  cachedir=inner_cachedir)
+    score = estimator.score(X_test, y_test)
+    return i_fold, score, nv_cls
 
 import time
 verbose = 1
 lofar = LofarDataset(datapath)
-#skf = StratifiedKFold(n_splits=10)
 estimator = ConvNetClassifier(conv_filter_sizes=((2, 10),),
                               conv_strides=((2, 5),),
                               conv_activations=("tanh",),
@@ -198,19 +166,13 @@ estimator = ConvNetClassifier(conv_filter_sizes=((2, 10),),
                               epochs=50,
                               metrics=['acc']#, sp_index]
                               )
-# estimator = mlpclassifier(layer_sizes=(10,4),
-#                           activations=('tanh', 'softmax'),
-#                           input_shape=(400,),
-#                           epochs=100)
+
 start = time.time()
-results = lofar_iter(estimator, novelty_detectionCV, verbose)
+pool = Pool(2)
+results = lofar_iter(estimator, novelty_detectionCV, pool, verbose)
 stop = time.time()
 
 print stop - start
 
-import pandas as pd
-#for key, value in results.items():
-#    print key
-#:wq    print len(value)
 pd.DataFrame(results).to_csv('./results.csv')
 
