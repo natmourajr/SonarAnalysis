@@ -22,11 +22,14 @@ def trgt2categorical(trgt, n_classes):
 
 
 class SonarRunsInfo():
-    def __init__(self, inputdatapath, window, verbose=False):
+    def __init__(self, inputdatapath, window, overlap=0, decimation_rate=1, verbose=False):
         self.inputdatapath = inputdatapath
         self.runs = OrderedDict()
         self.runs_named = OrderedDict()
         self.verbose = verbose
+
+        if decimation_rate<1:
+            decimation_rate=1
 
         # Load runs from folders
         class_offset = 0
@@ -39,7 +42,7 @@ class SonarRunsInfo():
             run_paths = map(lambda x: self.inputdatapath + '/' + class_folder + '/' + x, run_files)
             run_names.sort()
             run_paths.sort()
-            run_indices = list(self._iterClassIndices(run_paths, class_offset, window))
+            run_indices = list(self._iterClassIndices(run_paths, class_offset, window, overlap, decimation_rate))
             if self.verbose:
                 offsets = list(map(lambda x: x[0], run_indices))
                 lengths = list(map(len, run_indices))
@@ -54,17 +57,18 @@ class SonarRunsInfo():
             self.runs[class_folder] = run_indices
             self.runs_named[class_folder] = {filename: indices for filename, indices in zip(run_names, run_indices)}
 
-    def _iterClassIndices(self, runpaths, class_offset, window):
+    def _iterClassIndices(self, runpaths, class_offset, window, overlap=0, decimation_rate=1):
         run_offset = 0
         for run in runpaths:
-            run_indices = self._getRunIndices(run, class_offset + run_offset, window)
+            run_indices = self._getRunIndices(run, class_offset + run_offset, window, overlap=overlap, decimation_rate=decimation_rate)
             run_offset += len(run_indices)
             yield run_indices
 
-    def _getRunIndices(self, runfile, offset, window):
+    def _getRunIndices(self, runfile, offset, window, overlap=0, decimation_rate=1):
         with contextlib.closing(wave.open(runfile, 'r')) as runfile:
             frames = runfile.getnframes()
-            end_frame = frames / window + offset
+            frames = frames//decimation_rate
+            end_frame = (frames - overlap) / (window - overlap) + offset
 
         return range(offset, end_frame)
 
@@ -249,6 +253,7 @@ class Lofar2Image(BaseEstimator, TransformerMixin):
 def lofar2image(all_data, all_trgt,
                 index_info, window_size, stride,
                 run_indices_info,
+		overlap=0,
                 filepath=None,
                 dtype=np.float64):
 
@@ -272,7 +277,8 @@ def lofar2image(all_data, all_trgt,
         new_data = np.array(new_data.reshape(new_data.shape[0], new_data.shape[1], 1), np.float64)
         image_data[image_index] = new_data
         trgt_image[image_index] = all_trgt[spectre_index]
-
+    print np.unique(trgt_image)
+    raise NotImplementedError
     return [image_data, trgt_image]
 
 def lofar_mean(data, trgt, sliding_window):
