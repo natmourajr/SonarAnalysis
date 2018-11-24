@@ -17,7 +17,6 @@ matplotlib.use('Agg')
 from Functions.CrossValidation import SonarRunsCV
 import pandas as pd
 homedir = os.getenv('HOME')
-homedir = '/home/pedrolisboa/'
 sys.path.extend([os.path.join(homedir, 'Workspace', 'lps', 'LpsToolbox')])
 from multiprocessing import Pool
 from itertools import starmap, product
