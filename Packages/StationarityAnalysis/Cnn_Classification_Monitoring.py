@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # ## Projeto Sonar
-# ### Análise de estacionaridade para diferentes janelamentos. 
+# ### Análise de estacionaridade para diferentes janelamentos.
 # #### Dataset: 4classes
 # #### Autor: Pedro Henrique Braga Lisboa (pedrohblisboa@gmail.com)
 # #### Laboratorio de Processamento de Sinais - UFRJ
@@ -44,28 +44,38 @@ def factor2(num):
 
 
 window_list = [8192, 4096, 2048, 1024, 512, 256, 128]
-overlap_list = [0]
-decimation_rate = 3
-spectrum_bins_left_list = [3270, 1630, 820, 400, 205, 103, 52]
+#overlap_list = [0, 0, 0 ,0 ,0 , 0, 0]
+overlap_list = window_list[1:]
+overlap_list.append(64)
+decimation_rate_list = [0, 3]
+spectrum_bins_left_list = [3270, 1630, 820,400, 205, 103, 52]
+lofar = LofarDataset(datapath)
 
+param_list_w_overlap = list(product(zip(window_list, spectrum_bins_left_list, overlap_list), decimation_rate_list))
+param_list_no_overlap = [((window, spectrum_bins_left, 0), decimation_rate)
+                           for ((window, spectrum_bins_left, _), decimation_rate) in param_list_w_overlap]
+param_list = param_list_w_overlap + param_list_no_overlap
+#param_list = param_list_w_overlap
 
 def lofar_iter(estimator, train_fun, pool, verbose):
     results = {'window': [],
                'overlap': [],
+	       'decimation':[],
                'fold': [],
-               'scores': [],
                'novelty': []}
-    for (window, spectrum_bins_left), overlap in product(zip(window_list, spectrum_bins_left_list), overlap_list):
-        print window
-        skf = SonarRunsCV(10, os.path.join(audiodatapath, database), window)
+    for (window, spectrum_bins_left, overlap), decimation_rate in param_list:
+        skf = SonarRunsCV(10, os.path.join(audiodatapath, database), window, overlap, decimation_rate)
         if verbose:
-            print('Window: %i  Overlap: %i' % (window, overlap))
+            print('Window: %i  Overlap: %i  Decimation: %i' % (window, overlap, decimation_rate))
         X, y, class_labels = lofar.loadData(database, window, overlap, decimation_rate, spectrum_bins_left)
-        cvo_file = os.path.join(results_path, 
-                                'db_%s_window_%i_overlap_%i_dec_%i_bins_%i_skf.jbl' % (database, 
-                                                                                     window, 
-                                                                                     overlap, 
-                                                                                     decimation_rate, 
+	if decimation_rate < 1:
+		decimation_rate = 1
+
+        cvo_file = os.path.join(results_path,
+                                'db_%s_window_%i_overlap_%i_dec_%i_bins_%i_skf.jbl' % (database,
+                                                                                     window,
+                                                                                     overlap,
+                                                                                     decimation_rate,
                                                                                      spectrum_bins_left))
         if os.path.exists(cvo_file):
             if verbose:
@@ -77,17 +87,21 @@ def lofar_iter(estimator, train_fun, pool, verbose):
             cvo = list(skf.split(X, y))
             joblib.dump(cvo, cvo_file)
         cachedir = os.path.join('FullClassification', cvo_file[:-4])
-
-        s_info = SonarRunsInfo(os.path.join(audiodatapath, database), window)
+        print cachedir
+        s_info = SonarRunsInfo(os.path.join(audiodatapath, database), window, overlap, decimation_rate)
         partial_results = train_fun(X,y, cvo, estimator, verbose, s_info, cachedir, pool)
 
-        window_l = list(repeat(window, len(partial_results['scores'])))
-        overlap_l = list(repeat(overlap, len(partial_results['scores'])))
+        window_l = list(repeat(window, len(partial_results['fold'])))
+        overlap_l = list(repeat(overlap, len(partial_results['fold'])))
+        decimation_l = list(repeat(decimation_rate, len(partial_results['fold'])))
         results['window'].extend(window_l)
         results['overlap'].extend(overlap_l)
+        results['decimation'].extend(decimation_l)
         for key in partial_results:
+	    if key not in results.keys():
+		results[key] = list()
             results[key].extend(partial_results[key])
-            
+
     return results
 
 
@@ -107,9 +121,18 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir, pool=No
 
     # results = dview.map_sync(train_fold, [(i_fold, train, test) for i_fold, (train, test) in enumerate(cvo)])
     fold,scores, classes = map(list,zip(*results))
-    return {'fold': fold,
-            'scores': scores,
-            'novelty': classes}
+    nv_results = {'fold':fold,
+ 		  'novelty':classes}
+    if isinstance(scores[0], dict):
+	for key in scores[0].keys():
+		nv_results[key] = list()
+	for score in scores:
+		for key in score:
+			nv_results[key].append(score[key])
+    else:
+	nv_results['scores'] = scores
+
+    return nv_results
 
 
 def train_fold(data):
@@ -134,6 +157,7 @@ def train_fold(data):
 
     mask = np.ones(4, dtype=bool)
     mask[novelty_cls]=False
+    print y_train.shape
     if y_train.shape[1] == 4:
         y_train = y_train[:, mask]
         y_test = y_test[:, mask]
@@ -151,8 +175,8 @@ def train_fold(data):
                   n_inits=1,
                   verbose=verbose,
                   cachedir=inner_cachedir)
-    score = estimator.score(X_test, y_test)
-    return i_fold, score, nv_cls
+    scores = estimator.score(X_test, y_test)#, return_eff=True)
+    return i_fold, scores, nv_cls
 
 import time
 verbose = 1
@@ -168,7 +192,7 @@ estimator = ConvNetClassifier(conv_filter_sizes=((2, 10),),
                               )
 
 start = time.time()
-pool = Pool(2)
+pool = Pool(7)
 results = lofar_iter(estimator, novelty_detectionCV, pool, verbose)
 stop = time.time()
 

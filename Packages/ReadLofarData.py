@@ -33,10 +33,10 @@ database = "4classes"
 # decimation_rate = 3;
 # spectrum_bins_left = 400;
 
-n_pts_fft = sys.argv[1]
-num_overlap = sys.argv[2]
-decimation_rate = sys.argv[3]
-spectrum_bins_left = sys.argv[4]
+n_pts_fft = int(sys.argv[1])
+num_overlap = int(sys.argv[2])
+decimation_rate = int(sys.argv[3])
+spectrum_bins_left = int(sys.argv[4])
 
 
 if not os.path.exists("%s/%s/data_info_file.mat"%(datapath,database)):
