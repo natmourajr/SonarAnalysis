@@ -17,6 +17,7 @@ matplotlib.use('Agg')
 from Functions.CrossValidation import SonarRunsCV
 import pandas as pd
 homedir = os.getenv('HOME')
+homedir = '/home/pedrolisboa/'
 sys.path.extend([os.path.join(homedir, 'Workspace', 'lps', 'LpsToolbox')])
 from multiprocessing import Pool
 from itertools import starmap, product
@@ -114,9 +115,9 @@ def novelty_detectionCV(X, y, cvo, estimator, verbose, s_info, cachedir, pool=No
 
 def train_fold(data):
     i_fold, train, test, nv_cls, X, y, s_info, cachedir = data
-    window_qtd=10
+    window_qtd=int(sys.argv[1])
     window_qtd_stride=5
-
+    print window_qtd
     print i_fold
     print nv_cls
     X_train, y_train = lofar2image(X, y, train, window_qtd, window_qtd_stride, s_info)
@@ -174,5 +175,5 @@ stop = time.time()
 
 print stop - start
 
-pd.DataFrame(results).to_csv('./results.csv')
+pd.DataFrame(results).to_csv('./results_%s_windows.csv' % sys.argv[1])
 
