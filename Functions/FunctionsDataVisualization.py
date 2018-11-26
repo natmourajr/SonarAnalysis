@@ -11,7 +11,6 @@ import numpy as np
 from itertools import cycle
 from sklearn.metrics import confusion_matrix
 
-
 def add_subplot_axes(ax,rect,axisbg='w'):
     fig = plt.gcf()
     box = ax.get_position()
@@ -46,19 +45,19 @@ def plotConfusionMatrix(predictions,
                         set_label = True):
     """Plots a confusion matrix from the network output
 
-        Args:
-            predictions (numpy.ndarray): Estimated target values
-            trgt (numpy.ndarray) : Correct target values
-            class_labels (dict): Mapping between target values and class names
-            confusion matrix parameter. If None
-            fontsize (int): Size of the annotations inside the matrix tiles
-            figsize (tuple): A 2 item tuple, the first value with the horizontal size
-            of the figure. Defaults to 15
-            the second with the vertical size. Defaults to (10,6).
-            precision (int): Decimal portion length of the tiles annotations.
-            Defaults to 2
-            set_label (bool): Whether to draw axis labels. Defaults to True
-        """
+    Args:
+        predictions (numpy.ndarray): Estimated target values
+        trgt (numpy.ndarray) : Correct target values
+        class_labels (dict): Mapping between target values and class names
+        confusion matrix parameter. If None
+        fontsize (int): Size of the annotations inside the matrix tiles
+        figsize (tuple): A 2 item tuple, the first value with the horizontal size
+        of the figure. Defaults to 15
+        the second with the vertical size. Defaults to (10,6).
+        precision (int): Decimal portion length of the tiles annotations.
+        Defaults to 2
+        set_label (bool): Whether to draw axis labels. Defaults to True
+    """
 
     confusionMatrix = confusion_matrix(trgt, predictions)
     if normalize:
@@ -75,14 +74,18 @@ def plotConfusionMatrix(predictions,
         ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=fontsize)
 
 
-def plotScores(scores_dataframe,
+def plotScores(scores_df,
                class_labels,
                title,
                x_label="",
                y_label=("Classification Efficiency", "SP Index"),
                y_inf_lim = 0.80,
                figsize=(15,8)):
-    molten_scores = scores_dataframe.melt(id_vars=['Class'])
+    """ Plot the results of a model evalutaion
+
+    Args:
+    """
+    molten_scores = scores_df.melt(id_vars=['Class'])
     order_cats = molten_scores['variable'].unique()
 
     sns.set_style("whitegrid")
@@ -138,11 +141,20 @@ def plotScores(scores_dataframe,
     return fig
 
 
-def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True):
-    """Plot LOFARgram from an array of frequency spectre values
+def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=None, colorbar=True):
+    """Plot Spectrogram from an matrix of time-frequency spectre values.
 
     Args:
-    image (numpy.array): Numpy array with the frequency spectres along the second axis
+    image (numpy.array): 2D Numpy array with the frequency spectres along the second axis
+    ax (matplotlib.Axes): axis on which to plot the image.
+                          If None, image is plotted on a new axis.  Defaults to None.
+    filename (string): saving path for the plot. If None, the file is not saved. Defaults to None.
+    cmap (string): colormap of the image
+    vmin (float): Value to scale the plot colormap
+    vmax (float): Value to scale the plot colormap
+    colorbar ():
+
+    :return
     """
     if ax is None:
         fig = plt.figure(figsize=(20, 20))
@@ -152,8 +164,8 @@ def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True)
         plt.rcParams['ytick.labelsize'] = 30
 
         x= plt.imshow(image,
-                   cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
-                   aspect="auto")
+                      cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
+                      aspect="auto", vmin=vmin, vmax=vmax)
 
         plt.xlabel('Frequency bins', fontweight='bold')
         plt.ylabel('Time (seconds)', fontweight='bold')
@@ -168,10 +180,10 @@ def plotLOFARgram(image,ax = None, filename = None, cmap = 'jet', colorbar=True)
     else:
         x = ax.imshow(image,
                    cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
-                   aspect="auto")
+                   aspect="auto", vmin=vmin, vmax=vmax)
         if colorbar:
             plt.colorbar(x, ax=ax)
-        return
+        return x
 
 
 def plotHBar(x, y, hue, err, data, height=0.20, order=None, hue_order=None,

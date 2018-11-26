@@ -4,6 +4,7 @@
     Laboratorio de Tecnologia Sonar - UFRJ/Marinha do Brasil
 """
 import os
+import numpy as np
 import joblib
 from .lofar import lofar, tpsw
 
@@ -13,7 +14,7 @@ class LofarAnalysis:
         self.stftargs = {'n_pts_fft': n_pts_fft,
                          'n_overlap': n_overlap}
         self.tpswargs = tpswargs
-        print 'init'
+        self.lofar_data = None
         self.spectrum_bins_left = spectrum_bins_left
 
     def from_raw_data(self, raw_data, fs_data, database, outputpath=None, verbose=1):
@@ -24,7 +25,6 @@ class LofarAnalysis:
         n_pts_fft = self.stftargs['n_pts_fft']
         n_overlap = self.stftargs['n_overlap']
         spectrum_bins_left = self.spectrum_bins_left
-        print 'long before'
         lofar_data = self._from_raw_data(raw_data, fs_data, verbose)
 
         if spectrum_bins_left is 'auto':
@@ -38,7 +38,7 @@ class LofarAnalysis:
                                                                                spectrum_bins_left)
                                                  )
                         )
-        self.lofar_data
+        self.lofar_data = lofar_data
         return lofar_data
 
     def _from_raw_data(self, raw_data, fs, verbose=0):
@@ -47,23 +47,40 @@ class LofarAnalysis:
         n_overlap = self.stftargs['n_overlap']
         spectrum_bins_left = self.spectrum_bins_left
 
-        lofar_data = dict()
-        for cls, runs in raw_data.items():
-            for run, run_data in runs.items():
-                print 'before'
-                power, _, _= lofar(data=run_data,
+        lofar_data = list()
+        for cls, runs in sorted(raw_data.items()):
+            run_array = list()
+            for run, run_data in sorted(runs.items()):
+                power, _, _ = lofar(data=run_data,
                                    fs=fs[cls][run],
                                    n_pts_fft=n_pts_fft,
                                    n_overlap=n_overlap,
                                    decimation_rate=decimation_rate,
                                    spectrum_bins_left=spectrum_bins_left,
                                    **self.tpswargs)
+                #lofar_data[cls] = dict()
+                #lofar_data[cls][run] = power
+                run_array.append(power)
+            lofar_data.append(np.concatenate(run_array, axis=1))
+        lofar_data = np.concatenate(lofar_data, axis=1)
+        return lofar_data
 
-                lofar_data[cls][run] = power
+    def from_chunk(self, data_chunk, fs, verbose=0):
+        decimation_rate = self.decimation_rate
+        n_pts_fft = self.stftargs['n_pts_fft']
+        n_overlap = self.stftargs['n_overlap']
+        spectrum_bins_left = self.spectrum_bins_left
 
+        power, freq, time = lofar(data=data_chunk,
+                                  fs=fs,
+                                  n_pts_fft=n_pts_fft,
+                                  n_overlap=n_overlap,
+                                  decimation_rate=decimation_rate,
+                                  spectrum_bins_left=spectrum_bins_left,
+                                  **self.tpswargs)
 
-    def from_stream(self, audio_stream, verbose=0):
-        pass
+        return power, freq, time
+
 
     def from_obj(self):
         pass

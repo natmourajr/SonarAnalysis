@@ -36,7 +36,7 @@ else
     Fs=fs;
 end
 
-[Power, freq, time]=spectrogram(data, hanning(n_pts_fft), num_overlap, n_pts_fft, Fs);
+[Power, freq, time]=spectrogram(dec_data, hanning(n_pts_fft), num_overlap, n_pts_fft, Fs);
 Power = abs(Power);
 Power=Power./tpsw(Power);
 Power=log10(Power);

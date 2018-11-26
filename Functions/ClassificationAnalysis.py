@@ -27,7 +27,7 @@ from keras import backend as backend
 import matplotlib.pyplot as plt
 
 from Functions.ConvolutionalNeuralNetworks import OldKerasModel
-from Functions.FunctionsDataVisualization import plotConfusionMatrix, plotLOFARgram
+from Functions.FunctionsDataVisualization import plotConfusionMatrix, plotSpectrogram
 from Functions.NpUtils.DataTransformation import SonarRunsInfo, lofar2image
 from Functions.NpUtils.Scores import recall_score, spIndex
 from Functions.SystemIO import exists, mkdir, save, load
@@ -1020,7 +1020,7 @@ class ModelDataCollection:
                     ax = plt.gca()
                     print ship_name
 
-                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+                    plotSpectrogram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
 
                     mask = np.concatenate([np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
                                            for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
@@ -1075,7 +1075,7 @@ class ModelDataCollection:
                     ax = plt.gca()
                     print ship_name
 
-                    plotLOFARgram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
+                    plotSpectrogram(np.concatenate(run)[:, :, 0], ax=ax, cmap='Greys', colorbar=False)
 
                     mask = np.concatenate([p * np.ones_like(sample) if int(p) == int(t) else np.zeros_like(sample)
                                            for i, (p, t, sample) in enumerate(zip(run_p, run_trgt, run))])
@@ -1134,7 +1134,7 @@ class ModelDataCollection:
                                     #     print "Layer %s_%i output already plotted. For overwriting current plots, " \
                                     #           "set overwrite to True. Exiting." % (layer.identifier, n)
                                     #     break
-                                plotLOFARgram(channel, filename=outpath + '/%i_fold_%s.png' % (i_fold, ship_name))
+                                plotSpectrogram(channel, filename=outpath + '/%i_fold_%s.png' % (i_fold, ship_name))
 
     def _reconstructPredictions(self, data, trgt, image_window):
         """Retro-compatibility function. Used to update prediction files old storage format to the new one"""

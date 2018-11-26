@@ -10,7 +10,7 @@ from keras.models import load_model
 import sklearn.metrics
 from sklearn.externals import joblib
 
-from Functions.FunctionsDataVisualization import plotLOFARgram
+from Functions.FunctionsDataVisualization import plotSpectrogram
 from Functions.NpUtils.DataTransformation import lofar2image, lofar_mean, SonarRunsInfo
 from Functions.CrossValidation import NestedCV, SonarRunsCV
 
@@ -62,8 +62,8 @@ for cv_name, cv in ncv.cv.items():
         new_xtest = lofar_mean(x_test, y_test, 4)
 
         for cls_i in np.unique(trgt):
-            plotLOFARgram(np.concatenate(new_xtest[y_test == cls_i][:,:,:,0], axis=0),
-                          filename='/home/pedrolisboa/lofar_mean_test/%s_%i_%i.png' % (cv_name, cls_i, i_fold))
+            plotSpectrogram(np.concatenate(new_xtest[y_test == cls_i][:, :, :, 0], axis=0),
+                            filename='/home/pedrolisboa/lofar_mean_test/%s_%i_%i.png' % (cv_name, cls_i, i_fold))
 
 
 
