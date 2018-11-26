@@ -31,6 +31,7 @@ class NoveltyDetectionAnalysis:
         self.model_hash = model_hash
         self.load_hash = load_hash
         self.verbose = verbose
+        self.load_data = load_data
         
         self.all_data = None
         self.all_trgt = None
@@ -55,7 +56,7 @@ class NoveltyDetectionAnalysis:
         else:
             self.setParameters(parameters)
         
-        if load_data:
+        if self.load_data:
             self.loadData()
 
         self.CVO = self.getCVO()
@@ -69,7 +70,7 @@ class NoveltyDetectionAnalysis:
                 exit()
         self.parameters = parameters
         # Set the hash of the JSON text with the parameters
-        self.model_hash = hashlib.sha256(json.dumps(parameters)).hexdigest()
+        self.model_hash = hashlib.sha256(json.dumps(parameters).encode(encoding='UTF-8')).hexdigest()
         self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs", self.model_hash)
         self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
 
@@ -125,7 +126,7 @@ class NoveltyDetectionAnalysis:
     def setNfolds(self):
         self.n_folds = self.parameters["HyperParameters"]["n_folds"]
 
-        if load_data:
+        if self.load_data:
             self.loadData()
 
         self.CVO = self.getCVO()
@@ -197,6 +198,7 @@ class NoveltyDetectionAnalysis:
             if self.parameters["HyperParameters"]["classifier_output_activation_function"] in ["tanh"]:
                 # Transform the output into [-1,1]
                 self.all_trgt_sparse = 2 * self.all_trgt_sparse - np.ones(self.all_trgt_sparse.shape)
+            self.load_data = False
 
     def balanceData(self):
         # Process data
