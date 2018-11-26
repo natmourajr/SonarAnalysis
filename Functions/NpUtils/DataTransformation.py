@@ -253,10 +253,8 @@ class Lofar2Image(BaseEstimator, TransformerMixin):
 def lofar2image(all_data, all_trgt,
                 index_info, window_size, stride,
                 run_indices_info,
-		overlap=0,
                 filepath=None,
                 dtype=np.float64):
-
     fold_runs = np.concatenate([np.extract([np.isin(run, index_info).all() for run in cls_runs], cls_runs)
                                 for cls_runs in run_indices_info.runs.values()])
     pruned_indexes = np.concatenate([range(run[0], run[-1] - window_size, stride) for run in fold_runs])
@@ -277,8 +275,8 @@ def lofar2image(all_data, all_trgt,
         new_data = np.array(new_data.reshape(new_data.shape[0], new_data.shape[1], 1), np.float64)
         image_data[image_index] = new_data
         trgt_image[image_index] = all_trgt[spectre_index]
+    print 'trgt'
     print np.unique(trgt_image)
-    raise NotImplementedError
     return [image_data, trgt_image]
 
 def lofar_mean(data, trgt, sliding_window):
