@@ -27,30 +27,15 @@ from Functions import DataHandler as dh
 
 class NoveltyDetectionAnalysis:
     def __init__(self, parameters=None, model_hash=None, load_hash=False, load_data=True, verbose=True):
-<<<<<<< HEAD
-        
         self.parameters = parameters
         self.model_hash = model_hash
         self.load_hash = load_hash
         self.verbose = verbose
         
-=======
-
->>>>>>> be5f24eedfda274df08347a615ace2305c26c90c
         self.all_data = None
         self.all_trgt = None
         self.all_trgt_sparse = None
         self.class_labels = None
-<<<<<<< HEAD
-        
-        # Enviroment variables
-        self.DATA_PATH = noveltyDetectionConfig.CONFIG['OUTPUTDATAPATH']
-        self.RESULTS_PATH = noveltyDetectionConfig.CONFIG['PACKAGE_NAME']
-
-        # paths to export results
-        if self.load_hash and self.model_hash is not None:
-=======
-        self.verbose = verbose
 
         # Enviroment variables
         self.DATA_PATH = noveltyDetectionConfig.CONFIG['OUTPUTDATAPATH']
@@ -60,7 +45,6 @@ class NoveltyDetectionAnalysis:
         # paths to export results
         if load_hash and model_hash is not None:
             self.model_hash = model_hash
->>>>>>> be5f24eedfda274df08347a615ace2305c26c90c
             self.baseResultsPath = os.path.join(self.RESULTS_PATH, parameters["Technique"], "outputs", self.model_hash)
             self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
             self.loadTrainParametersByHash(model_hash)
@@ -69,7 +53,6 @@ class NoveltyDetectionAnalysis:
             self.setDatabaseParameters()
             self.setNfolds()
         else:
-<<<<<<< HEAD
             self.setParameters(parameters)
         
         if load_data:
@@ -105,18 +88,6 @@ class NoveltyDetectionAnalysis:
     
     
     def setOutputFolders(self):
-=======
-            if parameters == None:
-                print("Parameters must not be None!")
-                exit()
-            self.parameters = parameters
-            # Set the hash of the JSON text with the parameters
-            self.model_hash = hashlib.sha256(json.dumps(parameters).encode("utf-8")).hexdigest()
-            self.baseResultsPath = os.path.join(self.RESULTS_PATH, self.parameters["Technique"], "outputs",
-                                                self.model_hash)
-            self.parameters_file = os.path.join(self.baseResultsPath, "parameters.json")
-
->>>>>>> be5f24eedfda274df08347a615ace2305c26c90c
         self.analysis_output_folder = os.path.join(self.baseResultsPath, "AnalysisFiles")
         self.pictures_output_folder = os.path.join(self.baseResultsPath, "Pictures")
 
@@ -131,18 +102,14 @@ class NoveltyDetectionAnalysis:
         if not os.path.exists(self.pictures_output_folder):
             print("Creating " + self.pictures_output_folder)
             os.makedirs(self.pictures_output_folder)
-<<<<<<< HEAD
     
     def setDatabaseParameters(self):
-=======
-
         # Save parameters file
         if not os.path.exists(self.parameters_file):
             with open(self.parameters_file, "w") as f:
                 print("Saving " + self.parameters_file)
                 json.dump(self.parameters, f)
 
->>>>>>> be5f24eedfda274df08347a615ace2305c26c90c
         # Database caracteristics
         self.database = self.parameters['InputDataConfig']['database']
         self.n_pts_fft = int(self.parameters['InputDataConfig']['n_pts_fft'])
@@ -157,9 +124,6 @@ class NoveltyDetectionAnalysis:
 
     def setNfolds(self):
         self.n_folds = self.parameters["HyperParameters"]["n_folds"]
-<<<<<<< HEAD
-    
-=======
 
         if load_data:
             self.loadData()
@@ -169,7 +133,6 @@ class NoveltyDetectionAnalysis:
         # For multiprocessing purpose
         self.num_processes = multiprocessing.cpu_count()
 
->>>>>>> be5f24eedfda274df08347a615ace2305c26c90c
     def loadData(self):
         m_time = time.time()
         # Check if LofarData has already been created...
@@ -329,16 +292,6 @@ class NoveltyDetectionAnalysis:
             with open(self.parameters_file, "r") as file:
                 print("Reading from " + self.parameters_file)
                 self.parameters = json.load(file)
-
-    # def plot_train_history_loss(self, history):
-    #    # summarize history for loss
-    #    plt.plot(history.history['loss'])
-    #    plt.plot(history.history['val_loss'])
-    #    plt.title('model loss')
-    #    plt.ylabel('loss')
-    #    plt.xlabel('epoch')
-    #    plt.legend(['train', 'test'], loc='upper right')
-    #    plt.show()
 
     def get_results_zip(self):
         shutil.make_archive(self.baseResultsPath, 'zip', self.baseResultsPath)
