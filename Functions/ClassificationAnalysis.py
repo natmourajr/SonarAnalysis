@@ -396,16 +396,12 @@ class NeuralClassification(ClassificationBaseClass):
 
         fig, ax = plt.subplots(figsize=(6,6),nrows=1, ncols=1)
         xtick = range(max_neurons+1)
-	print acc_vector
-	#ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        print acc_vector
+        #ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.errorbar(xtick,np.mean(acc_vector,axis=0),np.std(acc_vector,axis=0),fmt='o-',
                     color='k',alpha=0.7,linewidth=2.5)
         ax.set_ylabel('Acc',fontweight='bold',fontsize=15)
         ax.set_xlabel('Neurons',fontweight='bold',fontsize=15)
-<<<<<<< HEAD
-        ax.grid()
-        ax.xaxis.set_ticks(xtick)
-=======
         return None
     def analysis_train_plot(self,data,trgt,trn_info=None, n_neurons=1,fold=0):
         #print 'NeuralClassication analysis train plot function'
@@ -433,8 +429,6 @@ class NeuralClassification(ClassificationBaseClass):
 
         ax.set_ylabel('MSE',fontweight='bold',fontsize=15)
         ax.set_xlabel('Epochs',fontweight='bold',fontsize=15)
->>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
-        
         ax.grid()
         plt.legend()
 
