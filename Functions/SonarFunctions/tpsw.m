@@ -35,12 +35,14 @@ if nargin<3,n=round(npts*.04/2+1);end		% tamanho da janela lateral
 if nargin<4,p=round(n/8+1);end			% tamanho do gap lateral
 if nargin<5,a=2.0;end				% constante para calculo do limiar
 
-%[npts n p a]
+%[npts n p a]
+
 
 % Calcula media local usando janela com gap central
 %
 if p>0
-    h=[ones(1,n-p+1) zeros(1,2*p-1) ones(1,n-p+1)];	% Filtro com gap central ...
+    h=[ones(1,n-p+1) zeros(1,2*p-1) ones(1,n-p+1)];
+	% Filtro com gap central ...
 else
     h=[ones(1,2*n+1)];
     p=1;
@@ -57,17 +59,17 @@ mult=2*ixp./[ones(1,p-1)*ixp ixp:2*ixp]';%'	% Correcao dos pontos extremos
 mx(1:ix,:)=mx(1:ix,:).*(mult*ones(1,size(x,2)));% Pontos iniciais
 mx(npts-ix+1:npts,:)=mx(npts-ix+1:npts,:).*...
 	    (flipud(mult)*ones(1,size(x,2)));	% Pontos finais
-
-%return
-% Elimina picos para a segunda etapa da filtragem
-%
+% 
+% %return
+% % Elimina picos para a segunda etapa da filtragem
+% %
 ind1=find((x-a*mx)>0);				% Pontos maiores que a*mx
 x(ind1)=mx(ind1);				% Substitui pontos por mx
 mx=conv2(h,1,x);				% Filtra sinal
 mx=mx(ix:npts+ix-1,:);				% Corrige defasagem
-
-% Corrige pontos extremos do espectro
 % 
+% % Corrige pontos extremos do espectro
+% % 
 mx(1:ix,:)=mx(1:ix,:).*(mult*ones(1,size(x,2)));% Pontos iniciais
 mx(npts-ix+1:npts,:)=mx(npts-ix+1:npts,:).*...
 	    (flipud(mult)*ones(1,size(x,2)));	% Pontos finais
