@@ -18,6 +18,8 @@ from Functions.SystemIO import listfolders, listfiles, load, exists, save
 
 
 def trgt2categorical(trgt, n_classes):
+    warnings.warn('This function is deprecated and exists for compatibility purposes'
+                  'Use directly keras.utils.to_categorical instead')
     return keras.utils.to_categorical(trgt, num_classes=n_classes)
 
 
@@ -72,20 +74,13 @@ class SonarRunsInfo():
 
         return range(offset, end_frame)
 
-class Scaler:
-    def __init__(self, mode='std'):
-        self.mode = mode
-
-    def fit(self, X, y):
-        pass
-
-    def transform(self, X, y):
-        pass
-
 
 class Lofar2Image(BaseEstimator, TransformerMixin):
     def __init__(self, all_data, all_trgt, window_size, stride, run_indices_info,
                  filepath = None, channel_axis='last', dtype=np.float64, verbose=0, memory=None):
+        warnings.warn('This class is deprecated and exists for compatibility purposes.'
+                      'Use lofar2image function instead')
+
         super(Lofar2Image, self).__init__()
         self.window_size = window_size
         self.run_indices_info = run_indices_info
@@ -278,6 +273,7 @@ def lofar2image(all_data, all_trgt,
     print 'trgt'
     print np.unique(trgt_image)
     return [image_data, trgt_image]
+
 
 def lofar_mean(data, trgt, sliding_window):
     def ndma(data, sliding_window, axis):
