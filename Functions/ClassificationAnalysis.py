@@ -601,7 +601,7 @@ class NeuralClassification(ClassificationBaseClass):
         return fig
 
 =======
-    return K.mean(K.equal(trgt, K.lesser(output, threshold)))
+      return K.mean(K.equal(trgt, K.lesser(output, threshold)))
 
 >>>>>>> c48fd559f7c9b54f6c561e89fe3cbca211f40042
 
