@@ -64,9 +64,10 @@ def lofar(data, fs, n_pts_fft=1024, n_overlap=0,
                                     noverlap=n_overlap,
                                     nfft=n_pts_fft,
                                     fs=Fs,
+                                    detrend=False,
                                     axis=0,
-                                    scaling='density',
-                                    mode='complex')
+                                    scaling='spectrum',
+                                    mode='magnitude')
     power = np.absolute(power)
     power = power / tpsw(power)#, **tpsw_args)
     power = np.log10(power)
