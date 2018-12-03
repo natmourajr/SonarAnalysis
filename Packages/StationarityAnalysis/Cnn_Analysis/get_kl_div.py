@@ -65,7 +65,6 @@ else:
                 kde = KernelDensity(kernel=kernel, 
                                      bandwidth=0.5).fit(segment[:, np.newaxis])
                 kdes[cls][run_name][i] = np.exp(kde.score_samples(bins[:, np.newaxis]))
-    print(time.time() - start)
     joblib.dump(kdes, kde_path)
     
 from Functions.StatFunctions import KLDiv
