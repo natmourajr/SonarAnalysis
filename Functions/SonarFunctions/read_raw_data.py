@@ -15,6 +15,8 @@ import warnings
 from collections import OrderedDict
 import numpy as np
 import scipy.io.wavfile as wav
+import soundfile as sf
+# from librosa.core import load
 import pyaudio
 import queue
 from threading import Thread
@@ -109,9 +111,17 @@ class AudioData:
 
 
 def read_audio_file(filepath):
-    fs, signal= wav.read(filepath)
-    signal = (np.array(signal, np.float) - 128)/128.0
-
+    signal, fs = sf.read(filepath)
+#     fs, signal= wav.read(filepath)
+#     print(signal.max())
+#     print(signal.min())
+#     print(signal.dtype
+#     signal, fs = load(filepath)
+#     print(signal.max())
+#     print(signal.min())
+#     print(signal.dtype
+#     signal = (np.array(signal, np.float) - 128)/128.0
+#     signal = signal - signal.mean()
     return signal, fs
 
 def threaded(fn):
