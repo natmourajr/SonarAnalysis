@@ -15,7 +15,7 @@ if [[ "$USER" == "natmourajr" ]]; then
         export INPUTDATAPATH=/home/natmourajr/Public/Marinha/Data
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         # Mac OSX
-        export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Doutorado/SonarAnalysis
+        export SONAR_WORKSPACE=/Users/natmourajr/Workspace/Doutorado/SonarAnalysis_2
         export INPUTDATAPATH=/Users/natmourajr/Workspace/Doutorado/Data/SONAR/Classification
 
         # For matplotlib

@@ -18,7 +18,7 @@ from Functions.CrossValidation import SonarRunsCV
 import pandas as pd
 
 homedir = os.getenv('HOME')
-#homedir = '/home/pedrolisboa/'
+homedir = '/home/pedrolisboa'
 sys.path.extend([os.path.join(homedir, 'Workspace', 'lps', 'LpsToolbox')])
 from multiprocessing import Pool
 from itertools import starmap, product
@@ -50,7 +50,7 @@ window_list = [8192, 4096, 2048, 1024, 512, 256, 128]
 # overlap_list = [0, 0, 0 ,0 ,0 , 0, 0]
 overlap_list = window_list[1:]
 overlap_list.append(64)
-decimation_rate_list = [0, 3]
+decimation_rate_list = [0]#, 3]
 spectrum_bins_left_list = [3270, 1630, 820, 400, 205, 103, 52]
 lofar = LofarDataset(datapath)
 
@@ -59,8 +59,7 @@ param_list_no_overlap = [((window, spectrum_bins_left, 0), decimation_rate)
                          for ((window, spectrum_bins_left, _), decimation_rate) in param_list_w_overlap]
 param_list = param_list_w_overlap + param_list_no_overlap
 
-
-# param_list = param_list_w_overlap
+#param_list = param_list_no_overlap
 
 def lofar_iter(estimator, train_fun, pool, verbose):
     results = {'window': [],
@@ -182,7 +181,7 @@ def train_fold(data):
                   n_inits=1,
                   verbose=verbose,
                   cachedir=inner_cachedir)
-    scores = estimator.score(X_test, y_test)  # , return_eff=True)
+    scores = estimator.score(X_test, y_test, return_eff=True)
     return i_fold, scores, nv_cls
 
 

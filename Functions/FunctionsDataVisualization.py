@@ -141,7 +141,7 @@ def plotScores(scores_df,
     return fig
 
 
-def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=None, colorbar=True):
+def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=None, colorbar=True, extent=None):
     """Plot Spectrogram from an matrix of time-frequency spectre values.
 
     Args:
@@ -156,6 +156,8 @@ def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=N
 
     :return
     """
+    if extent is None:
+        extent = [1, image.shape[1], image.shape[0], 1]
     if ax is None:
         fig = plt.figure(figsize=(20, 20))
         plt.rcParams['font.weight'] = 'bold'
@@ -165,7 +167,7 @@ def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=N
 
         x= plt.imshow(image,
                       cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
-                      aspect="auto", vmin=vmin, vmax=vmax)
+                      aspect="auto", extend=extent, vmin=vmin, vmax=vmax)
 
         plt.xlabel('Frequency bins', fontweight='bold')
         plt.ylabel('Time (seconds)', fontweight='bold')
@@ -179,7 +181,7 @@ def plotSpectrogram(image, ax=None, filename=None, cmap='jet', vmin=None, vmax=N
         return fig
     else:
         x = ax.imshow(image,
-                   cmap=cmap, extent=[1, image.shape[1], image.shape[0], 1],
+                   cmap=cmap, extent=extent,
                    aspect="auto", vmin=vmin, vmax=vmax)
         if colorbar:
             plt.colorbar(x, ax=ax)

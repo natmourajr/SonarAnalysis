@@ -9,6 +9,8 @@ import joblib
 from .lofar import lofar, tpsw
 
 class LofarAnalysis:
+    CLS_MAPPING = {'ClassA': 0, 'ClassB': 1, 'ClassC': 2, 'ClassD': 3}
+
     def __init__(self, decimation_rate, n_pts_fft, n_overlap, spectrum_bins_left='auto', **tpswargs):
         self.decimation_rate = decimation_rate
         self.stftargs = {'n_pts_fft': n_pts_fft,
@@ -48,22 +50,29 @@ class LofarAnalysis:
         spectrum_bins_left = self.spectrum_bins_left
 
         lofar_data = list()
+        lofar_trgt = list()
         for cls, runs in sorted(raw_data.items()):
             run_array = list()
+            run_trgt = list()
             for run, run_data in sorted(runs.items()):
-                power, _, _ = lofar(data=run_data,
-                                   fs=fs[cls][run],
-                                   n_pts_fft=n_pts_fft,
-                                   n_overlap=n_overlap,
-                                   decimation_rate=decimation_rate,
-                                   spectrum_bins_left=spectrum_bins_left,
-                                   **self.tpswargs)
+                power, freq, time = lofar(data=run_data,
+                                         fs=fs[cls][run],
+                                         n_pts_fft=n_pts_fft,
+                                         n_overlap=n_overlap,
+                                         decimation_rate=decimation_rate,
+                                         spectrum_bins_left=spectrum_bins_left,
+                                         **self.tpswargs)
                 #lofar_data[cls] = dict()
                 #lofar_data[cls][run] = power
                 run_array.append(power)
-            lofar_data.append(np.concatenate(run_array, axis=1))
-        lofar_data = np.concatenate(lofar_data, axis=1)
-        return lofar_data
+
+                iclass= self.CLS_MAPPING[cls]
+                run_trgt.append(np.repeat(iclass, power.shape[0]))
+            lofar_data.append(np.concatenate(run_array, axis=0))
+            lofar_trgt.append(np.concatenate(run_trgt))
+        lofar_data = np.concatenate(lofar_data, axis=0)
+        lofar_trgt = np.concatenate(lofar_trgt)
+        return lofar_data, lofar_trgt, freq
 
     def from_chunk(self, data_chunk, fs, verbose=0):
         decimation_rate = self.decimation_rate

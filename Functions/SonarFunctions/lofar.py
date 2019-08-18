@@ -53,30 +53,31 @@ def lofar(data, fs, n_pts_fft=1024, n_overlap=0,
         raise NotImplementedError
 
     if decimation_rate > 1:
-        #dec_data = decimate(data, decimation_rate, 10, 'fir', zero_phase=True)
+        dec_data = decimate(data, decimation_rate, 10, 'fir', zero_phase=True)
         Fs = fs/decimation_rate
     else:
         dec_data = data
         Fs=fs
-    freq, time, power = spectrogram(data,
+    freq, time, power = spectrogram(dec_data,
                                     window=('hann'),
                                     nperseg=n_pts_fft,
                                     noverlap=n_overlap,
                                     nfft=n_pts_fft,
                                     fs=Fs,
+                                    detrend=False,
                                     axis=0,
-                                    scaling='density',
-                                    mode='complex')
-    #power = np.absolute(power)
-    #power = power / tpsw(power)#, **tpsw_args)
-    #power = np.log10(power)
-    #power[power < -0.2] = 0
+                                    scaling='spectrum',
+                                    mode='magnitude')
+    power = np.absolute(power)
+    power = power / tpsw(power)#, **tpsw_args)
+    power = np.log10(power)
+    power[power < -0.2] = 0
 
     if spectrum_bins_left is None:
         spectrum_bins_left = power.shape[0]*0.8
     power = power[:spectrum_bins_left, :]
     freq = freq[:spectrum_bins_left]
 
-    return power, freq, time
+    return np.transpose(power), freq, time
 
 
