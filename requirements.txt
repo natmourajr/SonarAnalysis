@@ -18,7 +18,7 @@ futures==3.2.0
 gast==0.2.0
 grpcio==1.14.1
 h5py==2.6.0
-html5lib==0.9999999
+html5lib==0.999999999
 ipykernel==4.6.1
 ipython==5.4.1
 ipython-genutils==0.2.0
